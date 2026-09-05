@@ -61,6 +61,30 @@ def test_full_roundtrip_evidence(system):
     }
 
 
+def test_ecosystem_execution_trace(system):
+    _, client, headers, agent, *_ = system
+    work = client.post("/api/v1/work", headers=headers, json={"title": "Integrated work"}).json()
+    job = submit(system)
+    endpoint = f"/api/v1/work/{work['id']}/jobs/{job['id']}"
+    assert client.put(endpoint).status_code == 401
+    for _ in range(2):
+        assert client.put(endpoint, headers=headers).json()["execution_started"] is False
+    trace_url = f"/api/v1/work/{work['id']}/execution"
+    assert client.get(trace_url).status_code == 401
+    trace = client.get(trace_url, headers=headers).json()
+    assert len(trace["jobs"]) == 1
+    assert trace["jobs"][0]["evidence"] is None
+    agent.tick()
+    trace = client.get(trace_url, headers=headers).json()
+    assert trace["jobs"][0]["state"] == "SUCCEEDED"
+    evidence = trace["jobs"][0]["evidence"]
+    assert hashlib.sha256(evidence["content"].encode()).hexdigest() == evidence["sha256"]
+    assert trace["remote_synced"] is False
+    events = client.get("/api/v1/events", headers=headers).json()
+    assert len([e for e in events if e["type"] == "work.job_linked"]) == 1
+    assert client.put(f"/api/v1/work/{work['id']}/jobs/missing", headers=headers).status_code == 404
+
+
 def test_approval_exact_action_and_sandbox_package(system):
     _, client, headers, agent, *_ = system
     job = submit(system, "package_check", timeout=60)

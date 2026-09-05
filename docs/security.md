@@ -2,7 +2,7 @@
 
 ## Implemented
 
-- Operator password: random salt + scrypt hash; one-hour random session tokens stored hashed. Login throttling (10 failures/minute per direct peer). No cookies, so state mutations require explicit Bearer authorization rather than ambient browser credentials.
+- Operator password: random salt + scrypt hash; one-hour random session tokens stored hashed. Login throttling (10 failures/minute per direct peer). Staging now also issues a Secure, HttpOnly, SameSite=Strict, host-only `__Host-oida_session` cookie for navigation/reload. Cookie-authenticated mutations require an exact permitted Origin; invalid Bearer credentials cannot fall back to cookies. Logout revokes the hashed session and drops its linked identity from server memory. Explicit Bearer clients remain supported.
 - Initial setup is loopback-only, same-origin, one-time and cannot overwrite an existing owner.
 - Agent: unique Ed25519 identity, PKCS8 encryption at rest with user passphrase, public key only at control plane. Five-minute single-use enrollment tokens stored hashed.
 - Signed timestamp/nonce/body requests prevent replay and tampering. Jobs and result leases are identity-scoped.

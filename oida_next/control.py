@@ -19,8 +19,9 @@ from pathlib import Path
 import uvicorn
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import Field
 
 from .models import MODEL_REGISTRY, DeterministicPlanner
@@ -112,12 +113,19 @@ def job_view(row) -> dict:
     return result
 
 
-def create_app(path: Path, local_agent_url: str | None = None) -> FastAPI:
+def create_app(
+    path: Path, local_agent_url: str | None = None, *, identity_config=None, identity_transport=None
+) -> FastAPI:
     store = Store(path)
     app = FastAPI(title="OIDA Next", version="0.1.0")
     app.state.store = store
     app.state.local_agent_process = None
     failures: dict[str, list[float]] = {}
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_fields(request: Request, exc: RequestValidationError):
+        # Default validation detail can echo password/token input back in a response.
+        return JSONResponse({"detail": "Invalid request fields"}, status_code=422)
 
     def unlock_local_agent(password: str):
         if not local_agent_url:
@@ -205,15 +213,35 @@ def create_app(path: Path, local_agent_url: str | None = None) -> FastAPI:
 
     def operator(request: Request):
         value = request.headers.get("authorization", "")
-        if not value.startswith("Bearer "):
+        if value and not value.startswith("Bearer "):
+            raise HTTPException(401, "Invalid authorization scheme")
+        raw_token = value[7:] if value else request.cookies.get("__Host-oida_session", "")
+        if not raw_token:
             raise HTTPException(401, "Operator login required")
-        token_hash = hashlib.sha256(value[7:].encode()).hexdigest()
+        if (
+            not value
+            and request.method not in {"GET", "HEAD", "OPTIONS"}
+            and not permitted_origin(request)
+        ):
+            raise HTTPException(403, "Same-origin request required")
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
         with store.tx() as db:
             if not db.execute(
                 "SELECT 1 FROM sessions WHERE hash=? AND expires>?", (token_hash, time.time())
             ).fetchone():
                 raise HTTPException(401, "Session expired or invalid")
+        request.state.operator_session = token_hash
         return "operator"
+
+    def permitted_origin(request: Request) -> bool:
+        allowed = {os.environ.get("OIDA_PUBLIC_ORIGIN", "https://oida-next.kanphong.com")}
+        if request.url.hostname in {"127.0.0.1", "localhost", "::1"}:
+            allowed.add(str(request.base_url).rstrip("/"))
+        return request.headers.get("origin") in allowed
+
+    @app.get("/api/v1/session", dependencies=[Depends(operator)])
+    def current_session():
+        return {"authenticated": True}
 
     async def agent_auth(request: Request):
         agent = request.headers.get("x-agent-id", "")
@@ -257,7 +285,9 @@ def create_app(path: Path, local_agent_url: str | None = None) -> FastAPI:
         return {"status": "READY", "database": "READY", "protocol": "oida.v1"}
 
     @app.post("/api/v1/login")
-    def login(body: Login, request: Request):
+    def login(body: Login, request: Request, response: Response):
+        if request.headers.get("origin") and not permitted_origin(request):
+            raise HTTPException(403, "Login origin rejected")
         client = request.client.host if request.client else "unknown"
         now = time.time()
         failures[client] = [t for t in failures.get(client, []) if t > now - 60]
@@ -279,15 +309,28 @@ def create_app(path: Path, local_agent_url: str | None = None) -> FastAPI:
             )
             event(db, "operator.login", "operator")
         unlock_local_agent(body.password)
+        response.set_cookie(
+            "__Host-oida_session",
+            token,
+            max_age=3600,
+            secure=True,
+            httponly=True,
+            samesite="strict",
+            path="/",
+        )
         return {"access_token": token, "expires_in": 3600}
 
     @app.post("/api/v1/logout")
-    def logout(request: Request, actor=Depends(operator)):
+    def logout(request: Request, response: Response, actor=Depends(operator)):
         with store.tx() as db:
             db.execute(
                 "DELETE FROM sessions WHERE hash=?",
-                (hashlib.sha256(request.headers["authorization"][7:].encode()).hexdigest(),),
+                (request.state.operator_session,),
             )
+        app.state.disconnect_identity(request)
+        response.delete_cookie(
+            "__Host-oida_session", path="/", secure=True, httponly=True, samesite="strict"
+        )
         return {"ok": True}
 
     @app.post("/api/v1/enrollment")
@@ -358,6 +401,13 @@ def create_app(path: Path, local_agent_url: str | None = None) -> FastAPI:
                 }
                 for r in db.execute("SELECT * FROM agents")
             ]
+
+    from .ecosystem import install
+
+    install(app, store, operator, event)
+    from .identity_bridge import install_identity
+
+    install_identity(app, operator, identity_config, identity_transport, store, event)
 
     @app.get("/api/v1/models")
     def models(actor=Depends(operator)):
@@ -586,6 +636,12 @@ def create_app(path: Path, local_agent_url: str | None = None) -> FastAPI:
     def css():
         return FileResponse(Path(__file__).parent / "web/style.css", media_type="text/css")
 
+    @app.get("/ecosystem.js")
+    def ecosystem_javascript():
+        return FileResponse(
+            Path(__file__).parent / "web/ecosystem.js", media_type="text/javascript"
+        )
+
     @app.get("/setup.js")
     def setup_javascript():
         return FileResponse(Path(__file__).parent / "web/setup.js", media_type="text/javascript")
@@ -608,7 +664,13 @@ def main():
         help="Unlock an isolated local agent when the operator logs in",
     )
     args = parser.parse_args()
-    app = create_app(args.data, f"http://127.0.0.1:{args.port}" if args.local_agent else None)
+    from .identity_bridge import configured_identity
+
+    app = create_app(
+        args.data,
+        f"http://127.0.0.1:{args.port}" if args.local_agent else None,
+        identity_config=configured_identity(),
+    )
     if args.init:
         import getpass
 
