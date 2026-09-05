@@ -7,6 +7,7 @@ import hmac
 import json
 import os
 import secrets
+import socket
 import sqlite3
 import subprocess
 import sys
@@ -599,6 +600,9 @@ def main():
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--init", action="store_true")
     parser.add_argument(
+        "--socket", type=Path, help="Optional Unix socket for private Tunnel ingress"
+    )
+    parser.add_argument(
         "--local-agent",
         action="store_true",
         help="Unlock an isolated local agent when the operator logs in",
@@ -611,7 +615,30 @@ def main():
         app.state.store.initialize_password(
             getpass.getpass("New operator password (16+ characters): ")
         )
-    uvicorn.run(app, host=args.host, port=args.port, access_log=False, proxy_headers=False)
+    if not args.socket:
+        uvicorn.run(app, host=args.host, port=args.port, access_log=False, proxy_headers=False)
+        return
+    args.socket.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
+    if args.socket.exists() or args.socket.is_symlink():
+        if (
+            args.socket.is_symlink()
+            or not args.socket.is_socket()
+            or args.socket.stat().st_uid != os.getuid()
+        ):
+            raise SystemExit("Refusing to replace an unexpected ingress socket path")
+        args.socket.unlink()
+    local = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    local.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    local.bind((args.host, args.port))
+    ingress = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    ingress.bind(str(args.socket))
+    os.chmod(args.socket, 0o660)
+    try:
+        server = uvicorn.Server(uvicorn.Config(app, access_log=False, proxy_headers=False))
+        server.run(sockets=[local, ingress])
+    finally:
+        local.close()
+        ingress.close()
 
 
 if __name__ == "__main__":

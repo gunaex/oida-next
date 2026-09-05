@@ -8,41 +8,41 @@
       "state": "SUCCEEDED",
       "evidence": {
         "exit_code": 0,
-        "job": "2d69760415214398bfb65e4db2df47b5",
+        "job": "01e3ebc7200f4ceb963556163244b1fc",
         "output": "{\"os\": \"Linux\", \"architecture\": \"x86_64\", \"python\": \"3.12.3\", \"cpu_count\": 12}\n",
         "recipe": "system_info",
         "scope": "isolated-workspace"
       },
-      "sha256": "7fa0c8e9b63769b6234ecb58dcde9a7f57d8b67f529c60d415616a2ea7ac1c51"
+      "sha256": "dedd8141b97d27832f4d3eda4efc4476d8924c6c738537f49964bc9bd453de53"
     },
     {
       "recipe": "workspace_demo",
       "state": "SUCCEEDED",
       "evidence": {
         "exit_code": 0,
-        "job": "12b7ad0c4f384daca949f4ff248f15de",
+        "job": "513057d01a2547edb11f987188ae9031",
         "output": "{\"artifact\": \"artifact.txt\", \"sha256\": \"302009961443a35f5ad5b77f0bb1f6583247ebe4f562fd510caca74e1d2788cf\", \"content\": \"OIDA Next: goal to agent to verified evidence.\\n\"}\n",
         "recipe": "workspace_demo",
         "scope": "isolated-workspace"
       },
-      "sha256": "e6925e46a051198fad57458b220ffd71e32551fd8936d40a6547f7a1f03ca182"
+      "sha256": "9585f578ee0aaee22697f086021b2ace2d3e6425e4843f546fed72ae07e65c59"
     },
     {
       "recipe": "package_check",
       "state": "SUCCEEDED",
       "evidence": {
         "exit_code": 0,
-        "job": "7383a5fe34ae436f8126c5cdd1fc7abb",
-        "output": "{\"scope\": \"disposable virtualenv\", \"package\": \"pip\", \"check\": \"pip 24.0 from /tmp/oida-next-dogfood-mzab4nh5/agent/7383a5fe34ae436f8126c5cdd1fc7abb/sandbox/lib/python3.12/site-packages/pip (python 3.12)\", \"host_packages_modified\": false}\n",
+        "job": "5c35f863b16547d7ba2e6dada7838e8e",
+        "output": "{\"scope\": \"disposable virtualenv\", \"package\": \"pip\", \"check\": \"pip 24.0 from /tmp/oida-next-dogfood-ie7cu263/agent/5c35f863b16547d7ba2e6dada7838e8e/sandbox/lib/python3.12/site-packages/pip (python 3.12)\", \"host_packages_modified\": false}\n",
         "recipe": "package_check",
         "scope": "isolated-workspace"
       },
-      "sha256": "4a11dce5799cea9052c443f560523594add772f0c8592d1b5b92abf849d78e92"
+      "sha256": "24287f7c97f740401d41a40fffd9894d925552508e3991ea183de50fe506e462"
     }
   ],
   "control_restart": "PASS",
   "approval_gate": "PASS",
   "agent_restart": "PASS",
-  "event_count": 27,
+  "event_count": 26,
   "status": "PASS"
 }

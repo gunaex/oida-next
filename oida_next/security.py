@@ -18,6 +18,22 @@ def password_hash(password: str, salt: bytes) -> str:
 
 def redact(text: str) -> str:
     text = re.sub(
+        r'(?i)("(?:password|token|secret|authorization|api[_-]?key)"\s*:\s*)"(?:\\.|[^"\\])*"',
+        r'\1"[REDACTED]"',
+        text,
+    )
+    text = re.sub(
+        r"(?i)authorization\s*[:=]\s*(?:Bearer|Basic)\s+\S+",
+        "authorization=[REDACTED]",
+        text,
+    )
+    text = re.sub(
+        r"-----BEGIN (?:[A-Z ]*PRIVATE KEY)-----.*?-----END (?:[A-Z ]*PRIVATE KEY)-----",
+        "[REDACTED_PRIVATE_KEY]",
+        text,
+        flags=re.DOTALL,
+    )
+    text = re.sub(
         r"(?i)(password|token|secret|authorization|api[_-]?key)\s*[:=]\s*\S+",
         r"\1=[REDACTED]",
         text,

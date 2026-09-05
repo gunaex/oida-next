@@ -252,6 +252,14 @@ def test_unknown_goal_and_redaction():
     assert "\x1b" not in redact("\x1b[31mhello")
 
 
+def test_structured_and_bearer_secret_redaction():
+    assert json.loads(redact('{"token": "private value"}')) == {"token": "[REDACTED]"}
+    assert "private-value" not in redact("Authorization: Bearer private-value")
+    assert "private-material" not in redact(
+        "-----BEGIN PRIVATE KEY-----\nprivate-material\n-----END PRIVATE KEY-----"
+    )
+
+
 def test_setup_requires_loopback_origin_and_is_one_time(tmp_path):
     app = create_app(tmp_path / "setup.db")
     local = TestClient(app, base_url="http://127.0.0.1:8765", client=("127.0.0.1", 30000))
