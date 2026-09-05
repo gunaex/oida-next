@@ -1,0 +1,48 @@
+{
+  "product": "OIDA_NEXT",
+  "transport": "loopback HTTP, separate OS processes",
+  "remote_tls_phone_test": "NOT_RUN",
+  "jobs": [
+    {
+      "recipe": "system_info",
+      "state": "SUCCEEDED",
+      "evidence": {
+        "exit_code": 0,
+        "job": "2d69760415214398bfb65e4db2df47b5",
+        "output": "{\"os\": \"Linux\", \"architecture\": \"x86_64\", \"python\": \"3.12.3\", \"cpu_count\": 12}\n",
+        "recipe": "system_info",
+        "scope": "isolated-workspace"
+      },
+      "sha256": "7fa0c8e9b63769b6234ecb58dcde9a7f57d8b67f529c60d415616a2ea7ac1c51"
+    },
+    {
+      "recipe": "workspace_demo",
+      "state": "SUCCEEDED",
+      "evidence": {
+        "exit_code": 0,
+        "job": "12b7ad0c4f384daca949f4ff248f15de",
+        "output": "{\"artifact\": \"artifact.txt\", \"sha256\": \"302009961443a35f5ad5b77f0bb1f6583247ebe4f562fd510caca74e1d2788cf\", \"content\": \"OIDA Next: goal to agent to verified evidence.\\n\"}\n",
+        "recipe": "workspace_demo",
+        "scope": "isolated-workspace"
+      },
+      "sha256": "e6925e46a051198fad57458b220ffd71e32551fd8936d40a6547f7a1f03ca182"
+    },
+    {
+      "recipe": "package_check",
+      "state": "SUCCEEDED",
+      "evidence": {
+        "exit_code": 0,
+        "job": "7383a5fe34ae436f8126c5cdd1fc7abb",
+        "output": "{\"scope\": \"disposable virtualenv\", \"package\": \"pip\", \"check\": \"pip 24.0 from /tmp/oida-next-dogfood-mzab4nh5/agent/7383a5fe34ae436f8126c5cdd1fc7abb/sandbox/lib/python3.12/site-packages/pip (python 3.12)\", \"host_packages_modified\": false}\n",
+        "recipe": "package_check",
+        "scope": "isolated-workspace"
+      },
+      "sha256": "4a11dce5799cea9052c443f560523594add772f0c8592d1b5b92abf849d78e92"
+    }
+  ],
+  "control_restart": "PASS",
+  "approval_gate": "PASS",
+  "agent_restart": "PASS",
+  "event_count": 27,
+  "status": "PASS"
+}
