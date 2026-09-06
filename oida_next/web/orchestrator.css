@@ -1,0 +1,18 @@
+.badge.failure { color:#ff9c9c; border-color:#764040 }
+.primary-flow textarea { min-height:180px }
+.primary-flow button { width:100%; font-size:1rem }
+.section-title { display:flex; align-items:center; justify-content:space-between; gap:1rem }
+.section-title h2,.section-title h3 { margin:0 }
+.module-grid,.target-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:.75rem }
+.module-card { display:flex; flex-direction:column; gap:.45rem; padding:1.15rem; border:1px solid #2e3c50; background:#121b28; border-radius:7px; color:#e2e8f0; text-decoration:none }
+.module-card:hover { border-color:#57dbc3 }
+.module-card span { color:#a8b6ca; font-size:.88rem }
+.module-card small { color:#56dcc7 }
+.target-card { display:flex; align-items:center; justify-content:space-between; gap:.5rem; padding:.7rem; border:1px solid #2e3c50; border-radius:6px }
+.target-card small { color:#ffaaaa }
+.requirement-preview { white-space:pre-wrap; color:#b9c6d8; max-height:7rem; overflow:hidden }
+.orchestration-card>.secondary { margin-top:1rem }
+details#advanced { margin-top:2.5rem; border-top:1px solid #283243; padding-top:1rem }
+details#advanced>summary { cursor:pointer; color:#99a8be }
+.advanced-body { padding-top:1.5rem }
+@media(max-width:720px) { .module-grid,.target-grid { grid-template-columns:1fr } }

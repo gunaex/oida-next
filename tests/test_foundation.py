@@ -263,7 +263,7 @@ def test_readiness_protocol_ui(system):
     _, client, headers, *_ = system
     assert client.get("/ready").json()["status"] == "READY"
     assert client.get("/openapi.json").json()["info"]["title"] == "OIDA Next"
-    assert "Mission control" in client.get("/").text
+    assert "Ecosystem orchestrator" in client.get("/").text
     assert client.get("/app.js").status_code == 200
     assert client.get("/style.css").status_code == 200
     assert client.get("/api/v1/models", headers=headers).json()[0]["cost"] == 0

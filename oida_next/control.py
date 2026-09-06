@@ -641,6 +641,10 @@ def create_app(
     def css():
         return FileResponse(Path(__file__).parent / "web/style.css", media_type="text/css")
 
+    @app.get("/orchestrator.css")
+    def orchestrator_css():
+        return FileResponse(Path(__file__).parent / "web/orchestrator.css", media_type="text/css")
+
     @app.get("/ecosystem.js")
     def ecosystem_javascript():
         return FileResponse(
