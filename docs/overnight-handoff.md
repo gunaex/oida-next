@@ -1,5 +1,38 @@
 # Overnight continuation — 2026-09-05
 
+## COMPLETE — single-login orchestration accepted in production, 2026-09-07
+
+The owner workflow is live at https://oida-next.kanphong.com. One existing OIDA
+session opens PM, QA, Document and Infra without another login. The production
+browser verified PM as the existing `pmo_admin`, QA as the existing `ADMIN`, and
+opened both Document and Infra through the same session. Existing module roles,
+passwords and databases were preserved.
+
+The root page is now a requirement orchestrator. One submission durably creates
+and records a PM project plus planning task, QA project plus validation suite,
+Document project plus canonical requirement, and Infra workspace plus linked
+persisted design. Per-module checkpoints and an idempotency key retain successful
+work and retry only unfinished modules. Low-level agents, queue and events remain
+under Advanced operations. Manual pairing and reference-only controls are no
+longer part of the main path.
+
+Production acceptance record `OIDA Integration Acceptance 2026-09-07` completed
+in all four modules: PM task 1, QA suite 1, Document requirement REQ-0001, Infra
+workspace WS-C87D87E6 linked to DESIGN-000001. PM and QA were verified in their
+real project screens; Document showed the project and requirement; Infra showed
+the workspace and design after an Infra restart. Document's embedded PM/QA links
+now stay inside `/pm/` and `/qa/` instead of pointing to localhost.
+
+OIDA commits: 669d4af, 721014c, bceaae2. Document parent commit: ae08916.
+Canonical Infra commits: 0a49038 and a076ee5. OIDA checks: 54 pytest, Ruff and
+Mypy passed; Pages gateway: 9 Node tests passed; browser acceptance passed.
+Cloudflare Pages production was deployed from `dist/orchestrator-fix-20260907`.
+
+The existing `continue-oida-ecosystem-integration` heartbeat remains the only
+automation, targets this task, preserves 19:01 Asia/Bangkok, and is PAUSED because
+the integration objective is complete. Do not create a duplicate. Resume it only
+for a new requested integration phase.
+
 ## SSO UX correction — 2026-09-07 03:05 Bangkok
 
 User reported `Unexpected token '<'` in the OIDA work area and that PM/QA still
