@@ -1,5 +1,60 @@
 # Overnight continuation — 2026-09-05
 
+## Live PM/QA release — 2026-09-06 14:17 Bangkok
+
+Owner task remains 01a0758c-b175-7ef2-9396-4c058ffe382b. User asked for faster
+visible results and periodic updates including remaining progress. Continue
+working toward the full original integration; this release is only incremental.
+
+DEPLOYED to existing Cloudflare Pages project oida-next, production main:
+https://47719f99.oida-next.pages.dev (custom domain oida-next.kanphong.com).
+Previous deployment for rollback: cf76232f-b353-4ce8-ba76-8921ce5659b8.
+Bundle: dist/live-pm-qa-20260906. Fresh PM/QA builds use ORIGINAL module logins,
+not --unified. Root UI copied from the LIVE runtime to match its deployed API;
+staging identity/ecosystem UI/backend have NOT been deployed. Shared shell lists
+only included modules. ENABLE_LEGACY_MODULES=true, ENABLE_UNIFIED_MODULES=false
+in wrangler.toml. This is functional same-origin proxying, not shared login.
+
+Production changes: added https://oida-next.kanphong.com to ALLOWED_ORIGINS in
+PM/QA .env, preserved original domains, recreated ONLY those backend containers
+with existing images. Both healthy. Original settings backed up as
+.env.before-oida-origin-20260906 in each service root (private; do not print).
+PM online database backup: backups/20260906-071520 (integrity verified by script).
+QA full backup: backups/20260906-071521. No credentials or user records changed.
+Protected workloads and old domains remain untouched.
+
+Verified: real browser shows PM and QA login pages with same-origin navigation;
+both /modules/{pm,qa}/api/health 200 and unauthenticated projects 401. Invalid
+login returns 401 for both (use example.com, not reserved .invalid rejected by
+QA email validation). PM cross-origin login rejected 403. Gateway tests 9 pass;
+builder test passes. Authenticated end-to-end acceptance still needs actual
+owner login; do not claim it passed. No temporary production accounts created.
+
+Remaining: authenticated workflow acceptance; restricted owner exchange/shared
+login with explicit module pairing; actual Document/Infra runtimes and gateway;
+upload/download/cross-module/restore checks. Progress: 2/4 modules publicly
+routed to real backends, 0/4 full authenticated acceptance verified.
+
+## Ownership transferred — 2026-09-06, new chat
+
+Current implementation task: `01a0758c-b175-7ef2-9396-4c058ffe382b`.
+The user explicitly requested continuation from OIDA-CONTINUE.md, no rebuild.
+Read the previous STOP/HANDOFF below for the implementation baseline.
+The old task was confirmed idle before taking ownership.
+Existing automation `continue-oida-ecosystem-integration` was updated through
+Codex to target this task; ACTIVE, daily 19:05 Asia/Bangkok, same prompt and
+safeguards. No duplicate automation was created. Earlier old-task targeting
+statements below are historical and superseded by this section.
+
+Verified baseline: Next HEAD dce2078, clean working tree before this checkpoint;
+full Next pytest suite rerun: 51 passed (two dependency deprecation warnings).
+Inspected current identity bridge, pairing and project reader. Private Account
+socket and module gateway are implemented; PM/QA pairing and project reads
+still use HTTPS origins. Restricted owner-token exchange is still unimplemented.
+No production changes or new authentication authority have been provisioned.
+Next engineering work remains private runtime/owner onboarding and secure
+shared login, followed by actual backend and public workflow acceptance.
+
 ## STOP / HANDOFF — user requested a fresh chat, 2026-09-06 14:08 Bangkok
 
 User asked to move chats and schedule continuation after their reported quota

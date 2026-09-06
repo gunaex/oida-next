@@ -7,9 +7,11 @@ import shutil
 from pathlib import Path
 
 
-def build(destination: Path, modules: dict[str, Path] | None = None, shell: bool = False):
+def build(destination: Path, modules: dict[str, Path] | None = None, shell: bool = False,
+          web_source: Path | None = None):
     root = Path(__file__).resolve().parents[1]
     modules = modules or {}
+    web_source = web_source or root / "oida_next" / "web"
     routes = {"pm": "pm", "qa": "qa", "document": "documents", "infra": "infra"}
     for name, source in modules.items():
         if name not in routes or not (source / "index.html").is_file():
@@ -20,7 +22,9 @@ def build(destination: Path, modules: dict[str, Path] | None = None, shell: bool
     destination.mkdir(parents=True, exist_ok=False)
     manifest = {}
     for name in ("index.html", "app.js", "setup.js", "ecosystem.js", "style.css"):
-        source = root / "oida_next" / "web" / name
+        source = web_source / name
+        if name == "ecosystem.js" and not source.exists():
+            continue
         shutil.copyfile(source, destination / name)
         manifest[name] = hashlib.sha256(source.read_bytes()).hexdigest()
     worker = root / "deployment" / "pages-worker.js"
@@ -42,7 +46,8 @@ def build(destination: Path, modules: dict[str, Path] | None = None, shell: bool
             html = page.read_text()
             if "</head>" not in html:
                 raise ValueError("Module HTML is missing a head element")
-            html = html.replace("</head>", '<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script></head>', 1)
+            enabled = ",".join(routes[name] for name in modules)
+            html = html.replace("</head>", f'<link rel="stylesheet" href="/shell.css"><script src="/shell.js" data-modules="{enabled}" defer></script></head>', 1)
             page.write_text(html)
             manifest[str(page.relative_to(destination))] = hashlib.sha256(page.read_bytes()).hexdigest()
     (destination / "build-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
@@ -57,8 +62,9 @@ if __name__ == "__main__":
     parser.add_argument("--document", type=Path, help="Built Document bundle")
     parser.add_argument("--infra", type=Path, help="Built Infra bundle")
     parser.add_argument("--shell", action="store_true", help="Include shared application navigation")
+    parser.add_argument("--web-source", type=Path, help="Existing root UI matching the deployed backend")
     args = parser.parse_args()
     modules = {
         name: value for name in ("pm", "qa", "document", "infra") if (value := getattr(args, name))
     }
-    print(json.dumps(build(args.destination, modules, args.shell), indent=2))
+    print(json.dumps(build(args.destination, modules, args.shell, args.web_source), indent=2))
