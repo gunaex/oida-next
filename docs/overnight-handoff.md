@@ -1,5 +1,45 @@
 # Overnight continuation — 2026-09-05
 
+## ACTIVE — restore original AI orchestration, approved 2026-09-07
+
+The user explicitly approved continuous implementation until the AI-ready system
+is complete and said their limit resets at 07:55 Asia/Bangkok. Goal tracking is
+active on this task. The existing `continue-oida-ecosystem-integration` heartbeat
+was updated in place (no duplicate), renamed for 07:55, and set ACTIVE. It must
+not consume a usage-reset credit.
+
+Verified correction to the previous completion claim: production SSO and durable
+four-module scaffolding work, but OIDA does not yet call AI. The ERP and Data
+Platform samples contain one PM task, one QA suite, one Document requirement and
+one Infra workspace/design each; they are not AI-expanded projects.
+
+The original AI control plane is the existing `services/conductor-again`, not the
+new OIDA deterministic orchestrator. It already contains AI Resources, DeepSeek,
+local Ollama/vLLM/LM Studio support, multi-AI analysis, intake parsing, governed
+skills, deliberation, BusinessIntent/DeliveryRun orchestration, specialist
+dispatch and human approval policies. It is not deployed or routed through the
+current OIDA application. Its ecosystem mode routes execution through a Local AI
+Control Center contract; audit that dependency before selecting the production
+runtime path.
+
+Document retains backend provider settings for DeepSeek/OpenAI/Gemini/local
+Ollama and AI consultation/reviewer endpoints, but production has no saved AI
+settings or AI environment keys and its frontend exposes no provider setup UI.
+Canonical Infra contains genuine DeepSeek/local hybrid provider code in addition
+to a separate `/designs/{id}/ai-generate` route; that currently deployed route is
+template/rule-based and must not be presented as real LLM generation. PM and QA
+have no native LLM provider layer; they should receive validated structured AI
+outputs from the orchestrator.
+
+The host Ollama API is reachable at 127.0.0.1:11434 with Typhoon, Hermes, Llama,
+Mistral, Gemma and embedding models. Use local LLM first for production acceptance
+without requiring a paid key. Next: audit Conductor's identity/perimeter, database
+and Local AI execution contract; deploy it privately through the existing OIDA
+owner token; add provider configuration/status to OIDA; connect requirement intake
+to structured AI draft generation; validate outputs against module schemas;
+persist proposals; expose review/edit/approve; distribute only approved drafts;
+then run full production acceptance and expand the two sample projects.
+
 ## COMPLETE — single-login orchestration accepted in production, 2026-09-07
 
 The owner workflow is live at https://oida-next.kanphong.com. One existing OIDA
