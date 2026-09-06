@@ -351,21 +351,66 @@ def install_identity(
                 return
             partial = json.loads(saved["result"]) if saved and saved["result"] else {}
             result: dict | None
+
+            def checkpoint(value):
+                with store.tx() as db:
+                    db.execute(
+                        "INSERT OR REPLACE INTO orchestration_targets VALUES(?,?,?,?,?,?)",
+                        (
+                            orchestration_id,
+                            module,
+                            "IN_PROGRESS",
+                            json.dumps(value),
+                            None,
+                            time.time(),
+                        ),
+                    )
+
             try:
                 if module == "pm":
+                    if "project_id" not in partial:
+                        remote = await module_json(
+                            module,
+                            "POST",
+                            "projects",
+                            connection["token"],
+                            body={"name": title, "project_type": "simple"},
+                        )
+                        partial = {"project_id": remote.get("id"), "slug": remote.get("slug")}
+                        checkpoint(partial)
                     remote = await module_json(
                         module,
                         "POST",
-                        "projects",
+                        f"{partial['slug']}/tasks",
                         connection["token"],
-                        body={"name": title, "project_type": "simple"},
+                        body={
+                            "title": f"Review requirement: {title}",
+                            "description": requirement,
+                            "phase": "Planning",
+                            "status": "Todo",
+                            "priority": "High",
+                        },
                     )
-                    result = {"project_id": remote.get("id"), "slug": remote.get("slug")}
+                    result = {**partial, "task_id": remote.get("id")}
                 elif module == "qa":
+                    if "project_id" not in partial:
+                        remote = await module_json(
+                            module, "POST", "projects", connection["token"], body={"name": title}
+                        )
+                        partial = {"project_id": remote.get("id"), "slug": remote.get("slug")}
+                        checkpoint(partial)
                     remote = await module_json(
-                        module, "POST", "projects", connection["token"], body={"name": title}
+                        module,
+                        "POST",
+                        f"{partial['slug']}/suites",
+                        connection["token"],
+                        body={
+                            "name": f"Validate requirement: {title}",
+                            "description": requirement,
+                            "suite_type": "OTHER",
+                        },
                     )
-                    result = {"project_id": remote.get("id"), "slug": remote.get("slug")}
+                    result = {**partial, "suite_id": remote.get("id")}
                 elif module == "document":
                     if "project_id" not in partial:
                         key = "OIDA-" + orchestration_id.split("-")[0].upper()

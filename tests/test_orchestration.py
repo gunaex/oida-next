@@ -23,8 +23,12 @@ def test_requirement_creates_all_four_module_records_once(tmp_path):
             )
         assert request.headers["authorization"] == "Bearer shared-token"
         if request.url.host == "pm.test":
+            if request.url.path.endswith("/tasks"):
+                return httpx.Response(200, json={"id": 33})
             return httpx.Response(200, json={"id": 11, "slug": "alpha"})
         if request.url.host == "qa.test":
+            if request.url.path.endswith("/suites"):
+                return httpx.Response(200, json={"id": 44})
             return httpx.Response(200, json={"id": 22, "slug": "alpha"})
         if request.url.path == "/api/projects":
             return httpx.Response(201, json={"id": "prj-1", "key": "OIDA-123"})
