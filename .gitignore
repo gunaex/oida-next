@@ -12,3 +12,4 @@ data/
 *.enc
 dist/
 .wrangler/
+work/

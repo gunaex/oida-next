@@ -1,6 +1,7 @@
 """One-shot local credential proof; no module credentials leave this request."""
 
 import json
+import os
 
 import httpx
 
@@ -17,7 +18,8 @@ async def pair_account(
     config: ModuleConfig, email: str, password: str, identity_token: str, transport=None
 ):
     async with httpx.AsyncClient(
-        transport=transport, timeout=10, follow_redirects=False, trust_env=False
+        transport=transport, timeout=10, follow_redirects=False, trust_env=False,
+        headers={"Origin": os.environ.get("OIDA_PUBLIC_ORIGIN", "https://oida-next.kanphong.com")},
     ) as client:
 
         async def post(path, body):

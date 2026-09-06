@@ -30,8 +30,11 @@ class IdentityConfig:
     document_origin: str | None = None
     infra_origin: str | None = None
     module_sockets: dict[str, str] = field(default_factory=dict)
+    owner_exchange_token: SecretStr | None = field(default=None, repr=False)
 
     def __post_init__(self):
+        if self.owner_exchange_token and not self.account_socket:
+            raise ValueError("Owner exchange requires a private Account socket")
         ModuleConfig("pm", self.origin)
         ModuleConfig("pm", self.pm_origin)
         ModuleConfig("qa", self.qa_origin)
@@ -59,6 +62,8 @@ def configured_identity() -> IdentityConfig | None:
         raise ValueError("All three identity/module origins must be configured together")
     return IdentityConfig(values[0], values[1], values[2],
                           account_socket=os.environ.get("OIDA_ACCOUNT_SOCKET") or None,
+                          owner_exchange_token=SecretStr(os.environ["OIDA_OWNER_EXCHANGE_TOKEN"])
+                          if os.environ.get("OIDA_OWNER_EXCHANGE_TOKEN") else None,
                           document_origin=os.environ.get("OIDA_DOCUMENT_ORIGIN") or None,
                           infra_origin=os.environ.get("OIDA_INFRA_ORIGIN") or None,
                           module_sockets={name: socket for name in ("pm", "qa", "document", "infra")
@@ -92,11 +97,11 @@ def install_identity(
                 del attempts[key]
 
     @app.get("/api/v1/identity", dependencies=[Depends(operator)])
-    def status(request: Request):
-        prune()
-        connection = connections.get(session_key(request))
+    async def status(request: Request):
+        connection = await connected(request)
         return {
             "configured": config is not None,
+            "sso": bool(config and config.owner_exchange_token),
             "connected": bool(connection),
             "email": connection["email"] if connection else None,
             "expires": connection["expires"] if connection else None,
@@ -107,10 +112,12 @@ def install_identity(
         connections.pop(session_key(request), None)
         return {"disconnected": True}
 
-    @app.post("/api/v1/identity", dependencies=[Depends(operator)])
-    async def connect(body: IdentityLogin, request: Request):
+    async def establish(body: IdentityLogin | None, request: Request):
         if not config:
             raise HTTPException(503, "Shared identity is not configured")
+        capability = config.owner_exchange_token
+        if body is None and capability is None:
+            raise HTTPException(503, "Owner SSO is not configured")
         prune()
         # Global owner-level limit: issuing a fresh OIDA session cannot bypass it.
         history = attempts.setdefault("operator", [])
@@ -131,8 +138,9 @@ def install_identity(
                 ) as client,
                 client.stream(
                     "POST",
-                    account_origin + "/api/v1/auth/ecosystem-token",
-                    json={"email": body.email, "password": body.password.get_secret_value()},
+                    account_origin + ("/api/v1/auth/ecosystem-token" if body else "/api/v1/oida/owner-token"),
+                    json={"email": body.email, "password": body.password.get_secret_value()} if body else None,
+                    headers={"Authorization": "Bearer " + capability.get_secret_value()} if body is None and capability else None,
                 ) as response,
             ):
                 if response.status_code in {401, 403}:
@@ -156,7 +164,9 @@ def install_identity(
                 or not isinstance(ttl, int)
                 or isinstance(ttl, bool)
                 or not 0 < ttl <= 3600
-                or result.get("email") != body.email
+                or not isinstance(result.get("email"), str)
+                or not 3 <= len(result["email"]) <= 254
+                or (body is not None and result.get("email") != body.email)
                 or result.get("tokenType") != "Bearer"
             ):
                 raise HTTPException(502, "Invalid identity response")
@@ -167,9 +177,22 @@ def install_identity(
         connections[session_key(request)] = {
             "token": token,
             "expires": time.time() + ttl,
-            "email": body.email,
+            "email": result["email"],
         }
-        return {"connected": True, "email": body.email, "expires_in": ttl}
+        return {"connected": True, "email": result["email"], "expires_in": ttl}
+
+    async def connected(request):
+        prune()
+        key = session_key(request)
+        if key not in connections and config and config.owner_exchange_token:
+            await establish(None, request)
+        return connections.get(key)
+
+    @app.post("/api/v1/identity", dependencies=[Depends(operator)])
+    async def connect(body: IdentityLogin, request: Request):
+        if config and config.owner_exchange_token:
+            raise HTTPException(409, "Use your OIDA owner session")
+        return await establish(body, request)
 
     @app.get("/api/v1/modules/{module}/projects", dependencies=[Depends(operator)])
     async def projects(module: str, request: Request):
@@ -177,8 +200,7 @@ def install_identity(
             raise HTTPException(404, "Module not supported")
         if not config:
             raise HTTPException(503, "Shared identity is not configured")
-        prune()
-        connection = connections.get(session_key(request))
+        connection = await connected(request)
         if not connection:
             raise HTTPException(401, "Connect your shared identity first")
         origin = config.pm_origin if module == "pm" else config.qa_origin
@@ -195,8 +217,7 @@ def install_identity(
             raise HTTPException(404, "Module not supported")
         if not config:
             raise HTTPException(503, "Shared identity is not configured")
-        prune()
-        connection = connections.get(session_key(request))
+        connection = await connected(request)
         if not connection:
             raise HTTPException(401, "Connect your shared identity first")
         history = attempts.setdefault("pair-" + module, [])
@@ -223,8 +244,7 @@ def install_identity(
             raise HTTPException(404, "Module not supported")
         if not config:
             raise HTTPException(503, "Shared identity is not configured")
-        prune()
-        connection = connections.get(session_key(request))
+        connection = await connected(request)
         if not connection:
             raise HTTPException(401, "Connect your shared identity first")
         origin = getattr(config, f"{module}_origin")

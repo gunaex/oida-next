@@ -1,5 +1,74 @@
 # Overnight continuation — 2026-09-05
 
+## SSO and four-module deployment — 2026-09-07 03:00 Bangkok
+
+Deployed one OIDA entry login and unified gateway at
+https://oida-next.kanphong.com. PM and QA no longer show separate login forms
+after a cache-bypassing reload; they direct locked users back to OIDA. The
+private owner exchange is fixed to one provisioned owner identity and accepts
+no caller-selected account, tenant, email, or role. It uses a separate
+server-held capability over a Unix socket. OIDA logout removes the in-memory
+identity connection. No reset credit was consumed.
+
+Private systemd services are active and enabled for Account, Document and
+canonical Infra. Document and Infra listen only on Unix sockets. PM and QA run
+the staged SSO-aware images with pinned public verification key and preserve
+their legacy login and data on the old domains. Before activation, PM/QA online
+backups were created at 20260906-120920. All four OIDA/Account/Document/Infra
+SQLite databases were backed up and verified with isolated integrity checks.
+All four private services restarted successfully.
+
+Production Pages deployment: https://5d121153.oida-next.pages.dev on the
+existing oida-next project and custom domain. A server-side acceptance session
+verified `/api/v1/identity` 200, Document projects 200, Infra designs 200, and
+PM/QA 401 because their existing accounts have not yet been password-confirmed
+and linked. The temporary acceptance session was deleted. Existing user records,
+roles and passwords were not changed. Next suite 53 passes; Pages gateway 9;
+QA integration 16; PM identity integration 1; ruff and mypy pass. Public module
+HTML titles and private SSO authorization checks pass.
+
+Required user action: in the browser now on the OIDA root, enter the existing
+OIDA operator password. Under Module identity, use “Connect an existing PM or
+QA account” once for each module, entering each module's existing email/password
+in the application. Never request those passwords in chat. After the user says
+both are linked, verify authenticated PM/QA workflows through the public domain,
+then run upload/download and final cross-module browser acceptance. The task is
+not complete until those checks pass. Pause the heartbeat while this proof is
+required, then resume it when the user replies.
+
+## Schedule correction — 2026-09-06, latest user instruction
+
+User corrected their reading of quota: resume at 19:01 Asia/Bangkok for the
+five-hour reset, and continue working until the original integration succeeds.
+Existing heartbeat updated in place to ACTIVE daily 19:01, same current task.
+This supersedes all 08:46 scheduling below. No duplicate automation created.
+If quota resets seconds after 19:01, recheck after a short wait rather than
+skipping the whole day. Preserve the user-reported login failure and mandatory
+OIDA-entry SSO priorities below; do not claim completion without authenticated
+acceptance. Never consume reset credits without explicit permission.
+
+## USER CORRECTION / deferred continuation — 2026-09-06 14:23 Bangkok
+
+User reports PM/QA LOGIN DOES NOT WORK in the published OIDA release. Treat
+this as unresolved production failure; earlier health/login-page checks did
+NOT establish usability. User explicitly rejects separate PM/QA logins: one
+SSO login at OIDA is mandatory. Do not repeat the transitional-login detour or
+claim 2/4 integration complete from routing alone.
+
+User now requests continuation after usage returns, at 08:46. Existing heartbeat
+continue-oida-ecosystem-integration updated in place: ACTIVE, daily 08:46
+Asia/Bangkok, same current task; no duplicate. Check usage before resuming.
+At 14:22 Bangkok the account tool reported 5-hour window used 82%, reset
+2026-09-06 19:01:28 Bangkok; weekly used 90%, reset 2026-09-12 08:45:41 Bangkok.
+These are observations, not a guarantee or an explanation of changed times.
+Never consume a reset credit without explicit authorization.
+
+Next run: diagnose actual PM/QA authentication failure, implement secure OIDA
+entry-point SSO and one-time explicit account pairing preserving module roles,
+then finish Document/Infra real runtime integration and authenticated acceptance.
+User wants economical work and periodic concrete progress/remaining updates.
+No further production changes were made after the user's pause request.
+
 ## Live PM/QA release — 2026-09-06 14:17 Bangkok
 
 Owner task remains 01a0758c-b175-7ef2-9396-4c058ffe382b. User asked for faster

@@ -54,7 +54,7 @@ async function loadIdentity() {
       }
       if (!records.length) $("remote-projects").append(node("p", "No projects visible to this identity."));
     }));
-    $("identity-actions").append(action("Disconnect modules", async () => {
+    if (!state.sso) $("identity-actions").append(action("Disconnect modules", async () => {
       await api("/identity", "DELETE"); $("remote-projects").replaceChildren(); await loadIdentity();
     }));
   }

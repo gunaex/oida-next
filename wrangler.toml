@@ -2,12 +2,12 @@
 name = "oida-next"
 compatibility_date = "2026-09-05"
 
-pages_build_output_dir = "dist/live-pm-qa-20260906"
+pages_build_output_dir = "dist/live-four-sso-20260907"
 
 [vars]
-ENABLE_LEGACY_MODULES = "true"
-ENABLE_UNIFIED_MODULES = "false"
+ENABLE_LEGACY_MODULES = "false"
+ENABLE_UNIFIED_MODULES = "true"
 
 [env.production.vars]
-ENABLE_LEGACY_MODULES = "true"
-ENABLE_UNIFIED_MODULES = "false"
+ENABLE_LEGACY_MODULES = "false"
+ENABLE_UNIFIED_MODULES = "true"
