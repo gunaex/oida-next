@@ -1,5 +1,39 @@
 # Overnight continuation — 2026-09-05
 
+## STOP / HANDOFF — user requested a fresh chat, 2026-09-06 14:08 Bangkok
+
+User asked to move chats and schedule continuation after their reported quota
+reset at 19:05. Automation continue-oida-ecosystem-integration is now ACTIVE at
+19:05 Asia/Bangkok, still targeting thread 01a06ce7-75fb-7300-8f9c-6e2d8a6114ae.
+Retarget that EXISTING automation when a new task takes ownership; no duplicates
+or concurrent repository edits. The exact reset time was supplied by the user,
+not independently verified. Never redeem usage-reset credits without permission.
+
+All current implementation was committed locally, not pushed or deployed:
+- Next acb847a (plus this handoff update)
+- QA dbb6848
+- OIODA 3c77851 (Account factory earlier a828082)
+- canonical Infra ea1a644
+
+Final checks: Next 51 passed + lint/type checks; Pages 9 passed; PM 44 existing
+tests passed; QA 16 integration tests passed with real Account issuer included;
+Document 230 passed before pinned-key/factory additions, then 13 dedicated tests
+passed including real private app and tenant isolation; Infra 39 unit/contract/
+perimeter tests passed. Provider-mutating integration suites were NOT run.
+No test/build processes left running. Root has 14 GiB free; /data does not exist.
+Docker Compose is now v5.5.1 (read-only observation, not installed this turn).
+
+The LAST proposed next step was replacing the transitional double login with a
+restricted private owner-token exchange, relying on OIDA's existing verified
+owner session. This was DISCUSSED ONLY, NOT IMPLEMENTED. It must never become
+an arbitrary token-minting endpoint or impersonate CONDUCTOR_MAIN. Preserve
+explicit PM/QA password-confirmed linking and module-owned roles. No production
+Account owner, keys, token exchange, or identity pairing has been provisioned.
+
+Continue engineering from the existing code, not a fresh rebuild. Deployment,
+owner onboarding, backup/restore/restart validation and public end-to-end
+acceptance are still outstanding. Do not call this complete from test counts.
+
 ## Latest continuation — 2026-09-06, 14:00 heartbeat received during active work
 
 User explicitly said continue now, with 80% remaining. Do not treat the schedule
