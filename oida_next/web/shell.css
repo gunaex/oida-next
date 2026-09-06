@@ -1,0 +1,6 @@
+.oida-shell { display:flex; flex-wrap:wrap; align-items:center; gap:.35rem; padding:.6rem 1rem; background:#101c2d; color:#fff; font:500 1rem/1.5 system-ui,sans-serif; position:relative; z-index:40; }
+.oida-shell a { color:#cad5e5; padding:.4rem .75rem; border-radius:.35rem; text-decoration:none; }
+.oida-shell a:first-child { color:#fff; font-weight:750; margin-right:auto; }
+.oida-shell a:hover,.oida-shell a[aria-current] { color:#fff; background:#29405d; }
+.oida-shell a:focus-visible { outline:3px solid #67e8f9; outline-offset:2px; }
+@media(max-width:480px) { .oida-shell { gap:.15rem; padding:.5rem; } .oida-shell a { padding:.4rem .5rem; } .oida-shell a:first-child { flex-basis:100%; } }

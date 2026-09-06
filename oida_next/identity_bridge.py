@@ -8,13 +8,16 @@ are lost on restart rather than retaining account passwords or refresh tokens.
 import os
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import PurePosixPath
 
 import httpx
 from fastapi import Depends, HTTPException, Request
 from pydantic import Field, SecretStr
 
 from .module_client import ModuleConfig, ModuleUnavailable, ProjectReader
+from .module_gateway import GatewayTarget, forward_module
+from .module_pairing import PairingDenied, pair_account
 from .protocol import StrictModel
 
 
@@ -23,11 +26,26 @@ class IdentityConfig:
     origin: str
     pm_origin: str
     qa_origin: str
+    account_socket: str | None = None
+    document_origin: str | None = None
+    infra_origin: str | None = None
+    module_sockets: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self):
         ModuleConfig("pm", self.origin)
         ModuleConfig("pm", self.pm_origin)
         ModuleConfig("qa", self.qa_origin)
+        for origin in (self.document_origin, self.infra_origin):
+            if origin:
+                ModuleConfig("pm", origin)
+        for name, socket in self.module_sockets.items():
+            if name not in {"pm", "qa", "document", "infra"}:
+                raise ValueError("Unsupported private module")
+            GatewayTarget("https://private.invalid", socket)
+        if self.account_socket is not None:
+            path = PurePosixPath(self.account_socket)
+            if not path.is_absolute() or ".." in path.parts or str(path) == "/":
+                raise ValueError("Account socket must be an explicit absolute file path")
 
 
 def configured_identity() -> IdentityConfig | None:
@@ -39,7 +57,12 @@ def configured_identity() -> IdentityConfig | None:
         return None
     if not all(values):
         raise ValueError("All three identity/module origins must be configured together")
-    return IdentityConfig(*values)
+    return IdentityConfig(values[0], values[1], values[2],
+                          account_socket=os.environ.get("OIDA_ACCOUNT_SOCKET") or None,
+                          document_origin=os.environ.get("OIDA_DOCUMENT_ORIGIN") or None,
+                          infra_origin=os.environ.get("OIDA_INFRA_ORIGIN") or None,
+                          module_sockets={name: socket for name in ("pm", "qa", "document", "infra")
+                                          if (socket := os.environ.get(f"OIDA_{name.upper()}_SOCKET"))})
 
 
 class IdentityLogin(StrictModel):
@@ -94,14 +117,21 @@ def install_identity(
         if len(history) >= 5:
             raise HTTPException(429, "Please wait before retrying identity login")
         history.append(time.time())
+        # Private Account deployment never needs a public hostname or TCP port.
+        # The socket is operator-configured, never selected by a browser request.
+        account_transport = (
+            httpx.AsyncHTTPTransport(uds=config.account_socket)
+            if config.account_socket else transport
+        )
+        account_origin = "http://localhost" if config.account_socket else config.origin.rstrip("/")
         try:
             async with (
                 httpx.AsyncClient(
-                    transport=transport, timeout=10, follow_redirects=False, trust_env=False
+                    transport=account_transport, timeout=10, follow_redirects=False, trust_env=False
                 ) as client,
                 client.stream(
                     "POST",
-                    config.origin.rstrip("/") + "/api/v1/auth/ecosystem-token",
+                    account_origin + "/api/v1/auth/ecosystem-token",
                     json={"email": body.email, "password": body.password.get_secret_value()},
                 ) as response,
             ):
@@ -158,6 +188,50 @@ def install_identity(
             )
         except ModuleUnavailable:
             raise HTTPException(502, "Module unavailable or identity denied") from None
+
+    @app.post("/api/v1/modules/{module}/pair", dependencies=[Depends(operator)])
+    async def pair(module: str, body: IdentityLogin, request: Request):
+        if module not in {"pm", "qa"}:
+            raise HTTPException(404, "Module not supported")
+        if not config:
+            raise HTTPException(503, "Shared identity is not configured")
+        prune()
+        connection = connections.get(session_key(request))
+        if not connection:
+            raise HTTPException(401, "Connect your shared identity first")
+        history = attempts.setdefault("pair-" + module, [])
+        if len(history) >= 5:
+            raise HTTPException(429, "Please wait before retrying module pairing")
+        history.append(time.time())
+        origin = config.pm_origin if module == "pm" else config.qa_origin
+        try:
+            result = await pair_account(ModuleConfig(module, origin), body.email,
+                                        body.password.get_secret_value(), connection["token"], transport)
+        except PairingDenied as error:
+            raise HTTPException(error.status, error.message) from None
+        if store is not None and event is not None:
+            with store.tx() as db:
+                event(db, "identity.paired", "operator", payload={"system": module})
+        return result
+
+    @app.api_route("/api/v1/modules/{module}/proxy/{path:path}",
+                   methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"],
+                   include_in_schema=False,
+                   dependencies=[Depends(operator)])
+    async def proxy(module: str, path: str, request: Request):
+        if module not in {"pm", "qa", "document", "infra"}:
+            raise HTTPException(404, "Module not supported")
+        if not config:
+            raise HTTPException(503, "Shared identity is not configured")
+        prune()
+        connection = connections.get(session_key(request))
+        if not connection:
+            raise HTTPException(401, "Connect your shared identity first")
+        origin = getattr(config, f"{module}_origin")
+        if not origin:
+            raise HTTPException(503, "Module service is not configured")
+        return await forward_module(request, GatewayTarget(origin, config.module_sockets.get(module)), path,
+                                    connection["token"], transport)
 
     @app.post("/api/v1/modules/{module}/projects/{slug}/import", dependencies=[Depends(operator)])
     async def import_project(module: str, slug: str, request: Request):

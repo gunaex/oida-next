@@ -7,7 +7,7 @@ import shutil
 from pathlib import Path
 
 
-def build(destination: Path, modules: dict[str, Path] | None = None):
+def build(destination: Path, modules: dict[str, Path] | None = None, shell: bool = False):
     root = Path(__file__).resolve().parents[1]
     modules = modules or {}
     routes = {"pm": "pm", "qa": "qa", "document": "documents", "infra": "infra"}
@@ -33,6 +33,18 @@ def build(destination: Path, modules: dict[str, Path] | None = None):
                 manifest[str(file.relative_to(destination))] = hashlib.sha256(
                     file.read_bytes()
                 ).hexdigest()
+    if shell:
+        for name in ("shell.js", "shell.css"):
+            source = root / "oida_next" / "web" / name
+            shutil.copyfile(source, destination / name)
+            manifest[name] = hashlib.sha256(source.read_bytes()).hexdigest()
+        for page in [destination / "index.html", *(destination / routes[name] / "index.html" for name in modules)]:
+            html = page.read_text()
+            if "</head>" not in html:
+                raise ValueError("Module HTML is missing a head element")
+            html = html.replace("</head>", '<link rel="stylesheet" href="/shell.css"><script src="/shell.js" defer></script></head>', 1)
+            page.write_text(html)
+            manifest[str(page.relative_to(destination))] = hashlib.sha256(page.read_bytes()).hexdigest()
     (destination / "build-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     return manifest
 
@@ -44,8 +56,9 @@ if __name__ == "__main__":
     parser.add_argument("--qa", type=Path, help="Built QA bundle")
     parser.add_argument("--document", type=Path, help="Built Document bundle")
     parser.add_argument("--infra", type=Path, help="Built Infra bundle")
+    parser.add_argument("--shell", action="store_true", help="Include shared application navigation")
     args = parser.parse_args()
     modules = {
         name: value for name in ("pm", "qa", "document", "infra") if (value := getattr(args, name))
     }
-    print(json.dumps(build(args.destination, modules), indent=2))
+    print(json.dumps(build(args.destination, modules, args.shell), indent=2))

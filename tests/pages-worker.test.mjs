@@ -3,8 +3,31 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 
 const source = await readFile(new URL('../deployment/pages-worker.js', import.meta.url), 'utf8');
-const {moduleRequest, default: worker} = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
+const {moduleRequest, unifiedModuleRequest, default: worker} = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 const host = 'https://oida-next.kanphong.com';
+
+test('unified gateway forwards only owner cookie to fixed OIDA service', async () => {
+  const response = await unifiedModuleRequest(new Request(host + '/modules/qa/api/projects?archived=true', {
+    headers: {Cookie: '__Host-oida_session=owner; access_token=qa; __Secure-oida-pm-access_token=pm',
+      Authorization: 'Bearer attacker', 'X-Actor': 'administrator'},
+  }), 'qa', '/api/projects', async request => {
+    assert.equal(request.url, 'https://api-oida-next.kanphong.com/api/v1/modules/qa/proxy/projects?archived=true');
+    assert.equal(request.headers.get('cookie'), '__Host-oida_session=owner');
+    assert.equal(request.headers.get('authorization'), null);
+    assert.equal(request.headers.get('x-actor'), null);
+    return new Response('[]', {headers: {'Set-Cookie': 'secret=not-for-browser'}});
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('set-cookie'), null);
+});
+
+test('unified gateway denies missing owner session and cross-origin writes', async () => {
+  const send = () => assert.fail('must not forward');
+  assert.equal((await unifiedModuleRequest(new Request(host + '/modules/qa/api/projects'), 'qa', '/api/projects', send)).status, 401);
+  assert.equal((await unifiedModuleRequest(new Request(host + '/modules/qa/api/projects', {
+    method: 'POST', headers: {Cookie: '__Host-oida_session=owner', Origin: 'https://evil.test'},
+  }), 'qa', '/api/projects', send)).status, 403);
+});
 
 test('module gateway isolates credentials and response cookies', async () => {
   const request = new Request(host + '/modules/qa/api/projects', {headers: {

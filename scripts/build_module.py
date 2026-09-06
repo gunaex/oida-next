@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 
-def build(source: Path, destination: Path, module: str):
+def build(source: Path, destination: Path, module: str, unified: bool = False):
     routes = {"pm": "/pm/", "qa": "/qa/", "document": "/documents/", "infra": "/infra/"}
     if module not in routes or destination.exists():
         raise ValueError("Use a supported module and a fresh destination")
@@ -33,6 +33,7 @@ def build(source: Path, destination: Path, module: str):
                 "VITE_APP_BASE": routes[module],
                 "VITE_API_BASE_URL": f"/modules/{module}",
                 "VITE_API_URL": f"/modules/{module}",
+                "VITE_OIDA_UNIFIED": "true" if unified else "false",
             }
         )
         subprocess.run(["npm", "run", "build"], cwd=work, env=env, check=True)
@@ -46,5 +47,6 @@ if __name__ == "__main__":
     parser.add_argument("source", type=Path)
     parser.add_argument("destination", type=Path)
     parser.add_argument("module", choices=["pm", "qa", "document", "infra"])
+    parser.add_argument("--unified", action="store_true", help="Use the OIDA shared login gateway")
     args = parser.parse_args()
-    build(args.source, args.destination, args.module)
+    build(args.source, args.destination, args.module, args.unified)

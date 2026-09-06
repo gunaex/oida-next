@@ -16,6 +16,30 @@ async function loadIdentity() {
   $("identity-form").hidden = !state.configured || state.connected;
   $("identity-actions").replaceChildren();
   if (state.connected) {
+    const pairing = node("details");
+    pairing.append(node("summary", "Connect an existing PM or QA account"), node("p", "Confirm the existing account password once. Its email and permissions stay unchanged. This creates a permanent identity link; disconnecting this session does not remove that link."));
+    const form = node("form");
+    const moduleSelect = node("select");
+    for (const value of ["pm", "qa"]) { const option = node("option", value.toUpperCase()); option.value = value; moduleSelect.append(option); }
+    const email = node("input"); email.type = "email"; email.required = true; email.autocomplete = "username";
+    const password = node("input"); password.type = "password"; password.required = true; password.maxLength = 256; password.autocomplete = "current-password";
+    for (const [title, input] of [["Application", moduleSelect], ["Existing account email", email], ["Existing account password", password]]) {
+      const label = node("label", title); label.append(input); form.append(label);
+    }
+    const submit = node("button", "Verify and link account"); submit.type = "submit"; form.append(submit);
+    form.onsubmit = async e => {
+      e.preventDefault(); submit.disabled = true;
+      const body = {email: email.value, password: password.value};
+      const module = moduleSelect.value; password.value = "";
+      try {
+        await api(`/modules/${module}/pair`, "POST", body);
+        if (token !== session) return;
+        form.reset(); pairing.open = false;
+        message(`${module.toUpperCase()} account linked. Existing permissions are unchanged.`);
+      } catch (error) { if (token === session) message(error.message); }
+      finally { body.password = ""; submit.disabled = false; }
+    };
+    pairing.append(form); $("identity-actions").append(pairing);
     for (const module of ["pm", "qa"]) $("identity-actions").append(action(`Read ${module.toUpperCase()} projects`, async () => {
       const records = await api(`/modules/${module}/projects`);
       if (token !== session) return;

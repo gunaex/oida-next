@@ -194,11 +194,16 @@ def create_app(
     @app.middleware("http")
     async def boundaries(request: Request, call_next):
         # Host exposure is intentionally controlled by deployment, never trust forwarded headers.
+        from .module_gateway import MAX_UPLOAD
+
+        module_proxy = any(request.url.path.startswith(f"/api/v1/modules/{name}/proxy/")
+                           for name in ("pm", "qa", "document", "infra"))
+        limit = MAX_UPLOAD if module_proxy else 100000
         try:
             size = int(request.headers.get("content-length", "0"))
         except ValueError:
-            size = 100001
-        if size > 100000:
+            size = limit + 1
+        if size < 0 or size > limit:
             from starlette.responses import JSONResponse
 
             return JSONResponse({"detail": "Request too large"}, status_code=413)

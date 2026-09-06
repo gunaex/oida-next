@@ -4,6 +4,42 @@ const MODULE_ORIGINS = {
   qa: "https://api-qaagain.kanphong.com",
 };
 
+// Unified mode sends only the owner session to OIDA; the server supplies the
+// module identity after authorization. Never send a browser-selected identity.
+export async function unifiedModuleRequest(request, module, apiPath, send = fetch) {
+  const url = new URL(request.url);
+  if (!["pm", "qa", "document", "infra"].includes(module) || !apiPath.startsWith("/api/") || /[%\\]/.test(apiPath) || apiPath.includes("..")) {
+    return Response.json({detail: "Invalid module route"}, {status: 400});
+  }
+  if (!["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"].includes(request.method)) return new Response(null, {status: 405});
+  if (!["GET", "HEAD"].includes(request.method) && request.headers.get("Origin") !== url.origin) {
+    return Response.json({detail: "Same-origin request required"}, {status: 403});
+  }
+  const headers = new Headers();
+  for (const name of ["accept", "content-type", "origin", "range", "if-none-match"]) {
+    if (request.headers.has(name)) headers.set(name, request.headers.get(name));
+  }
+  const session = (request.headers.get("cookie") || "").split(";").map(x => x.trim())
+    .filter(x => x.startsWith("__Host-oida_session="));
+  if (session.length !== 1) return Response.json({detail: "Unlock OIDA first"}, {status: 401});
+  headers.set("cookie", session[0]);
+  try {
+    const upstream = await send(new Request(`${API_ORIGIN}/api/v1/modules/${module}/proxy/${apiPath.slice(5)}${url.search}`, {
+      method: request.method, headers, redirect: "manual", duplex: "half",
+      body: ["GET", "HEAD"].includes(request.method) ? undefined : request.body,
+    }));
+    if (upstream.status >= 300 && upstream.status < 400 && upstream.status !== 304) {
+      return Response.json({detail: "Unexpected gateway redirect"}, {status: 502});
+    }
+    const output = new Headers(upstream.headers);
+    output.delete("set-cookie"); output.delete("location");
+    output.set("Cache-Control", "no-store");
+    return new Response(upstream.body, {status: upstream.status, headers: output});
+  } catch {
+    return Response.json({detail: "Module gateway unavailable"}, {status: 502});
+  }
+}
+
 // Transitional same-origin gateway. Each module retains its own session until
 // shared identity is verified. Never give one module another module's cookie.
 export async function moduleRequest(request, module, apiPath, send = fetch) {
@@ -69,8 +105,9 @@ export async function moduleRequest(request, module, apiPath, send = fetch) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const moduleRoute = url.pathname.match(/^\/modules\/(pm|qa)(\/api\/.*)$/);
+    const moduleRoute = url.pathname.match(/^\/modules\/(pm|qa|document|infra)(\/api\/.*)$/);
     if (moduleRoute) {
+      if (env.ENABLE_UNIFIED_MODULES === "true") return unifiedModuleRequest(request, moduleRoute[1], moduleRoute[2]);
       if (env.ENABLE_LEGACY_MODULES !== "true") return Response.json({detail: "Module gateway not enabled"}, {status: 503});
       return moduleRequest(request, moduleRoute[1], moduleRoute[2]);
     }

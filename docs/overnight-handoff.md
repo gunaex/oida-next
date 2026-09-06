@@ -1,5 +1,62 @@
 # Overnight continuation — 2026-09-05
 
+## Latest continuation — 2026-09-06, 14:00 heartbeat received during active work
+
+User explicitly said continue now, with 80% remaining. Do not treat the schedule
+as a reason to stop implementation. No production changes in this slice.
+
+- Next now has password-confirmed PM/QA pairing from its UI. Local module login
+  cookies stay in a request-scoped client; the temporary refresh session is
+  revoked in finally. Server identity never goes to browser or logs. Existing
+  explicit issuer/subject mappings and module roles remain authoritative.
+- New fixed-upstream gateway supports all four module API namespaces. Owner
+  session + connected central identity are mandatory. Browser cookies/actor
+  headers are not forwarded to modules; only server-held central Bearer token.
+  Upload cap 8 MiB, download cap 32 MiB, no redirects, no response cookies.
+  API paths /api/v1/modules/{module}/proxy/{path} intentionally omitted from
+  OpenAPI to avoid duplicate operation IDs for multi-method proxy routes.
+- IdentityConfig supports private Account Unix socket, optional Document/Infra
+  origins, and per-module sockets. OIDA_ACCOUNT_SOCKET, OIDA_DOCUMENT_ORIGIN,
+  OIDA_INFRA_ORIGIN, OIDA_DOCUMENT_SOCKET, OIDA_INFRA_SOCKET are new deployment
+  inputs. Account socket has a real Unix-socket transport test, without DNS/TCP.
+  PM/QA pairing/project reader still use their HTTPS origins (not module sockets).
+- Pages has ENABLE_UNIFIED_MODULES opt-in mode forwarding only the owner cookie
+  to Next's fixed API gateway. Default remains disabled; legacy mode remains.
+  PM/QA --unified frontend builds use OIDA login/lock behavior. No live enablement.
+- Shared navigation is built with build_pages.py --shell; scripts/shell assets
+  only added to generated bundles, preserving all original module applications.
+  Latest bundle dist/unified-identity-shell-20260906 predates the final four-module
+  gateway extension; rebuild a fresh destination before any deployment.
+- Real Account Again factory + real QA routes + Next bridge test now covers
+  login, different-email pairing, revoked temporary refresh token, existing
+  VIEWER role, forbidden project creation, project reading/import, disabled user.
+  Run QA integration with PYTHONPATH containing backend, Next and Account roots.
+  All 16 integration tests passed together. PM original tests: 44 passed.
+- Document original tests + initial new security tests: 230 passed. Subsequent
+  private-key-pinning/factory tests: 13 passed, including real app bootstrap in a
+  temporary directory, authenticated project creation and cross-tenant isolation.
+  New app.oida_app:create_app requires explicit data/db/issuer/public key and
+  AUTH_MODE=ecosystem; disallows DATABASE_URL override. Human identity requires
+  exp/iat/sub/email/tenantId and <=1h lifetime, rejects forced-password-change.
+  Optional pinned PUBLIC key avoids needing a public Account JWKS endpoint.
+- Canonical Infra now has infra_again.oida_app:create_app: explicit dedicated
+  working/data directory, persistent RSA public key and allowed OWNER SUBJECT.
+  Signed identity mandatory; provider execution/runner writes/test routes denied.
+  Two tests pass, including real app in a temporary directory (no provider calls).
+  This is a design-only perimeter, not complete execution integration. The legacy
+  API includes demo generation and incomplete provider flows; don't label those
+  production-ready. Full canonical Infra regression remains to run.
+- Next full suite passed 50 before the last extra four-module routing test; that
+  new test passed separately. Node gateway suite: 9 passed. All lint/type checks
+  passed before the final checkpoint. No browser acceptance performed.
+
+Remaining: complete private runtime/owner provisioning and actual module config,
+PM trust transport/pinned key rollout, production backups + restore/restart test,
+all-module end-to-end public acceptance, larger-file handling if required, Infra
+approval-bound execution and remaining workflow preservation. No auto-linking
+production users; owner credential proof must occur through the app, never chat.
+Old URLs, services and databases remain untouched. No GitHub push yet.
+
 ## Newest checkpoint — 2026-09-06 after 02:30 continuation
 
 - QA canonical source is `/home/kanphong/services-staging/qa-again` (PM-QA-Again).
