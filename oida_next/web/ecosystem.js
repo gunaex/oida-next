@@ -17,6 +17,7 @@ async function loadIdentity() {
   $("identity-actions").replaceChildren();
   if (state.connected) {
     const pairing = node("details");
+    pairing.id = "module-pairing";
     pairing.append(node("summary", "Connect an existing PM or QA account"), node("p", "Confirm the existing account password once. Its email and permissions stay unchanged. This creates a permanent identity link; disconnecting this session does not remove that link."));
     const form = node("form");
     const moduleSelect = node("select");
@@ -40,6 +41,13 @@ async function loadIdentity() {
       finally { body.password = ""; submit.disabled = false; }
     };
     pairing.append(form); $("identity-actions").append(pairing);
+    const requestedModule = new URLSearchParams(location.search).get("connect");
+    if (["pm", "qa"].includes(requestedModule)) {
+      moduleSelect.value = requestedModule;
+      pairing.open = true;
+      pairing.scrollIntoView({behavior: "smooth", block: "center"});
+      message(`Confirm your existing ${requestedModule.toUpperCase()} account once to finish SSO.`);
+    }
     for (const module of ["pm", "qa"]) $("identity-actions").append(action(`Read ${module.toUpperCase()} projects`, async () => {
       const records = await api(`/modules/${module}/projects`);
       if (token !== session) return;

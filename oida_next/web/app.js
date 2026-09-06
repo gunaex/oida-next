@@ -6,7 +6,15 @@ document.querySelector("#login .muted").textContent = "Your secure session expir
 const message = (text) => { $("message").textContent = text; };
 async function api(path, method = "GET", body) {
   const response = await fetch(`/api/v1${path}`, {method, credentials:"same-origin", headers: {"Content-Type":"application/json", ...(token && !token.startsWith("cookie:") ? {Authorization:`Bearer ${token}`} : {})}, ...(body === undefined ? {} : {body:JSON.stringify(body)})});
-  const value = await response.json();
+  const contentType = response.headers.get("content-type") || "";
+  const text = await response.text();
+  let value;
+  if (contentType.includes("application/json")) {
+    try { value = JSON.parse(text); }
+    catch { throw new Error("The OIDA service returned an invalid response. Please refresh and retry."); }
+  } else {
+    throw new Error(response.ok ? "The OIDA service returned an unexpected response." : "The OIDA service is temporarily unavailable. Please retry.");
+  }
   if (!response.ok) throw new Error(typeof value.detail === "string" ? value.detail : "Request rejected; check the supplied fields.");
   return value;
 }

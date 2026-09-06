@@ -1,5 +1,31 @@
 # Overnight continuation — 2026-09-05
 
+## SSO UX correction — 2026-09-07 03:05 Bangkok
+
+User reported `Unexpected token '<'` in the OIDA work area and that PM/QA still
+showed “Continue in OIDA Next.” Investigation confirmed the OIDA cookie and
+private identity were valid; the central identity showed connected. PM/QA were
+correctly denying the as-yet-unlinked owner identity. The UI failed to lead the
+user directly to the required one-time proof, and stale unversioned scripts made
+the new behavior appear inconsistent.
+
+Deployed https://ac79db2b.oida-next.pages.dev to the existing production Pages
+project. PM/QA “Continue” now links to `/?connect=pm|qa`; OIDA opens the matching
+password-confirmed pairing form and selects that module. Root scripts are
+versioned to invalidate stale browser cache. API parsing now handles non-JSON
+upstream failures without leaking the raw JSON parser exception. Verified in
+the real browser: OIDA session is connected, PM route opens the expanded PM
+pairing form, all four navigation items render, and work/project empty states
+load without the earlier parser error.
+
+No password was entered by the agent. PM and QA remain unlinked and therefore
+unusable through SSO until the user enters each existing module credential once
+in the displayed OIDA form. This is required because production PM/QA emails
+differ and automatic merging is forbidden. After both successful link messages,
+verify `/pm/` and `/qa/` authenticated workflows, uploads/downloads, and final
+cross-module acceptance. Keep the heartbeat paused until the user completes
+this proof and replies.
+
 ## SSO and four-module deployment — 2026-09-07 03:00 Bangkok
 
 Deployed one OIDA entry login and unified gateway at
