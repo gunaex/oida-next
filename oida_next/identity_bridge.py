@@ -417,15 +417,60 @@ def install_identity(
                         "requirement_code": remote.get("code"),
                     }
                 else:
-                    remote = await module_json(
+                    if "workspace_id" not in partial:
+                        remote = await module_json(
+                            module,
+                            "POST",
+                            "v1/workspaces",
+                            connection["token"],
+                            body={"name": title, "fidelity": "LOCAL_RUNTIME"},
+                        )
+                        workspace = remote.get("workspace") or {}
+                        partial = {"workspace_id": workspace.get("workspaceId")}
+                        with store.tx() as db:
+                            db.execute(
+                                "INSERT OR REPLACE INTO orchestration_targets VALUES(?,?,?,?,?,?)",
+                                (
+                                    orchestration_id,
+                                    module,
+                                    "IN_PROGRESS",
+                                    json.dumps(partial),
+                                    None,
+                                    time.time(),
+                                ),
+                            )
+                    if "design_id" not in partial:
+                        remote = await module_json(
+                            module,
+                            "POST",
+                            "v1/designs",
+                            connection["token"],
+                            params={"name": title, "description": requirement},
+                        )
+                        design = remote.get("design") or {}
+                        partial["design_id"] = design.get("designId") or design.get("design_id")
+                        with store.tx() as db:
+                            db.execute(
+                                "INSERT OR REPLACE INTO orchestration_targets VALUES(?,?,?,?,?,?)",
+                                (
+                                    orchestration_id,
+                                    module,
+                                    "IN_PROGRESS",
+                                    json.dumps(partial),
+                                    None,
+                                    time.time(),
+                                ),
+                            )
+                    if not partial.get("workspace_id") or not partial.get("design_id"):
+                        raise ValueError("Missing Infra record identifier")
+                    await module_json(
                         module,
                         "POST",
-                        "v1/designs",
+                        f"v1/workspaces/{partial['workspace_id']}/current-design",
                         connection["token"],
-                        params={"name": title, "description": requirement},
+                        params={"design_id": partial["design_id"]},
                     )
-                    design = remote.get("design") or {}
-                    result = {"design_id": design.get("designId") or design.get("design_id")}
+                    result = partial
                 if not any(result.values()):
                     raise ValueError("Missing created record identifier")
                 status, error_text = "CREATED", None

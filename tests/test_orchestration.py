@@ -30,7 +30,11 @@ def test_requirement_creates_all_four_module_records_once(tmp_path):
             return httpx.Response(201, json={"id": "prj-1", "key": "OIDA-123"})
         if request.url.path == "/api/requirements":
             return httpx.Response(201, json={"id": "req-1", "code": "REQ-0001"})
-        return httpx.Response(200, json={"design": {"designId": "design-1"}})
+        if request.url.path == "/api/v1/workspaces":
+            return httpx.Response(200, json={"workspace": {"workspaceId": "ws-1"}})
+        if request.url.path == "/api/v1/designs":
+            return httpx.Response(200, json={"design": {"designId": "design-1"}})
+        return httpx.Response(200, json={"workspace": {"workspaceId": "ws-1"}})
 
     config = IdentityConfig(
         "https://account.test",
