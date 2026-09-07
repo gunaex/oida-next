@@ -61,6 +61,18 @@ def test_draft_requires_reviewed_hash_and_distributes_every_generated_item(tmp_p
 
     async def module_call(module, method, path, token, *, body=None, params=None):
         calls.append((module, method, path, token, body, params))
+        if method == "GET" and module == "pm":
+            return [{"id": "pm-task", "status": "Todo"}]
+        if method == "GET" and module == "qa" and path.endswith("/suites"):
+            return [{"id": "qa-suite", "status": "ACTIVE"}]
+        if method == "GET" and module == "qa":
+            return [{"id": "qa-case"}]
+        if method == "GET" and module == "document":
+            return [{"id": "document-requirement", "status": "DRAFT"}]
+        if method == "GET" and path.startswith("v1/workspaces/"):
+            return {"workspace": {"currentDesignId": "design"}}
+        if method == "GET" and path.startswith("v1/designs/"):
+            return {"design": {"designId": "design", "status": "DRAFT"}}
         if module == "pm" and path == "projects":
             return {"id": "pm-project", "slug": "delivery"}
         if module == "pm":
@@ -130,6 +142,12 @@ def test_draft_requires_reviewed_hash_and_distributes_every_generated_item(tmp_p
     }
     assert all(item["status"] == "CREATED" for item in result["items"])
     assert all(call[3] == "module-token" for call in calls)
+
+    verification = client.post(f"/api/v1/ai/drafts/{draft['id']}/verify")
+    assert verification.status_code == 200
+    assert verification.json()["healthy"] is True
+    assert set(verification.json()["modules"]) == {"pm", "qa", "document", "infra"}
+    assert client.get("/api/v1/ai/drafts").json()[0]["verification"]["healthy"] is True
 
     repeated = client.post(
         "/api/v1/ai/drafts",

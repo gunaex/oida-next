@@ -1,5 +1,6 @@
-"""Durable AI draft, human approval, and structured four-module distribution."""
+"""Durable AI drafts, approval, distribution, and live delivery verification."""
 
+import asyncio
 import hashlib
 import json
 import time
@@ -45,6 +46,10 @@ def install_ai_workflow(app, store, operator):
                 status TEXT NOT NULL,result TEXT,error TEXT,updated REAL NOT NULL,
                 PRIMARY KEY(draft_id,module,item_key),
                 FOREIGN KEY(draft_id) REFERENCES ai_drafts(id));
+            CREATE TABLE IF NOT EXISTS ai_verifications(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,draft_id TEXT NOT NULL,
+                checked REAL NOT NULL,result TEXT NOT NULL,
+                FOREIGN KEY(draft_id) REFERENCES ai_drafts(id));
         """)
         columns = {row[1] for row in db.execute("PRAGMA table_info(ai_drafts)")}
         if "error" not in columns:
@@ -58,6 +63,10 @@ def install_ai_workflow(app, store, operator):
             "SELECT module,item_key,status,result,error FROM ai_draft_items WHERE draft_id=? ORDER BY module,item_key",
             (draft_id,),
         ).fetchall()
+        last_check = db.execute(
+            "SELECT checked,result FROM ai_verifications WHERE draft_id=? ORDER BY id DESC LIMIT 1",
+            (draft_id,),
+        ).fetchone()
         return {
             "id": row["id"],
             "title": row["title"],
@@ -70,6 +79,11 @@ def install_ai_workflow(app, store, operator):
             "error": row["error"],
             "created": row["created"],
             "updated": row["updated"],
+            "verification": (
+                {"checked": last_check["checked"], **json.loads(last_check["result"])}
+                if last_check
+                else None
+            ),
             "items": [
                 {
                     "module": x["module"],
@@ -291,6 +305,153 @@ def install_ai_workflow(app, store, operator):
         result["failures"] = failures
         return result
 
+    @app.post("/api/v1/ai/drafts/{draft_id}/verify", dependencies=[Depends(operator)])
+    async def verify(draft_id: str, request: Request):
+        connection = await app.state.identity_connection(request)
+        if not connection:
+            raise HTTPException(401, "OIDA identity is unavailable")
+        with store.tx() as db:
+            draft = view(db, draft_id)
+        if draft["status"] != "APPROVED":
+            raise HTTPException(409, "Only approved work can run a full-loop check")
+        call, token = app.state.module_json, connection["token"]
+        checks = await asyncio.gather(
+            _safe_check("pm", _verify_pm, call, token, draft),
+            _safe_check("qa", _verify_qa, call, token, draft),
+            _safe_check("document", _verify_document, call, token, draft),
+            _safe_check("infra", _verify_infra, call, token, draft),
+        )
+        modules = {item["module"]: item for item in checks}
+        result = {
+            "healthy": all(item["verified"] for item in checks),
+            "modules": modules,
+        }
+        with store.tx() as db:
+            db.execute(
+                "INSERT INTO ai_verifications(draft_id,checked,result) VALUES(?,?,?)",
+                (draft_id, time.time(), json.dumps(result)),
+            )
+        return {"checked": time.time(), **result}
+
+
+def _created(draft: dict, module: str, key: str | None = None) -> list[dict]:
+    return [
+        item
+        for item in draft["items"]
+        if item["module"] == module
+        and item["status"] == "CREATED"
+        and (key is None or item["key"] == key)
+    ]
+
+
+async def _safe_check(module: str, checker, call, token: str, draft: dict) -> dict:
+    try:
+        return {"module": module, **await checker(call, token, draft)}
+    except (HTTPException, KeyError, TypeError, ValueError):
+        return {
+            "module": module,
+            "verified": False,
+            "state": "UNAVAILABLE",
+            "message": f"{module.title()} status could not be verified",
+        }
+
+
+async def _verify_pm(call, token: str, draft: dict) -> dict:
+    project = _created(draft, "pm", "project")[0]["result"]
+    expected_ids = {
+        item["result"]["task_id"]
+        for item in _created(draft, "pm")
+        if item["key"].startswith("task-")
+    }
+    tasks = await call("pm", "GET", f"{project['slug']}/tasks", token)
+    found = [task for task in tasks if task.get("id") in expected_ids]
+    done = sum(task.get("status") == "Done" for task in found)
+    return {
+        "verified": len(found) == len(expected_ids),
+        "state": "DONE" if found and done == len(found) else "IN_PROGRESS",
+        "found": len(found),
+        "expected": len(expected_ids),
+        "done": done,
+        "url": f"/pm/{project['slug']}/tasks",
+    }
+
+
+async def _verify_qa(call, token: str, draft: dict) -> dict:
+    project = _created(draft, "qa", "project")[0]["result"]
+    suite_ids = {
+        item["result"]["suite_id"]
+        for item in _created(draft, "qa")
+        if item["key"].startswith("suite-")
+    }
+    case_ids = {
+        item["result"]["case_id"]
+        for item in _created(draft, "qa")
+        if item["key"].startswith("case-")
+    }
+    revision_ids = [
+        item["result"]["revision_id"]
+        for item in _created(draft, "qa")
+        if item["key"].startswith("revision-")
+    ]
+    suites = await call("qa", "GET", f"{project['slug']}/suites", token)
+    found_suites = [suite for suite in suites if suite.get("id") in suite_ids]
+    case_lists = await asyncio.gather(
+        *(
+            call("qa", "GET", f"{project['slug']}/revisions/{item}/cases", token)
+            for item in revision_ids
+        )
+    )
+    found_cases = [case for cases in case_lists for case in cases if case.get("id") in case_ids]
+    verified = len(found_suites) == len(suite_ids) and len(found_cases) == len(case_ids)
+    return {
+        "verified": verified,
+        "state": "READY_FOR_EXECUTION" if verified else "INCOMPLETE",
+        "suites": {"found": len(found_suites), "expected": len(suite_ids)},
+        "cases": {"found": len(found_cases), "expected": len(case_ids)},
+        "url": f"/qa/{project['slug']}/suites",
+    }
+
+
+async def _verify_document(call, token: str, draft: dict) -> dict:
+    project = _created(draft, "document", "project")[0]["result"]
+    expected_ids = {
+        item["result"]["requirement_id"]
+        for item in _created(draft, "document")
+        if item["key"].startswith("requirement-")
+    }
+    requirements = await call(
+        "document", "GET", f"projects/{project['project_id']}/requirements", token
+    )
+    found = [item for item in requirements if item.get("id") in expected_ids]
+    confirmed = sum(item.get("status") == "CONFIRMED" for item in found)
+    return {
+        "verified": len(found) == len(expected_ids),
+        "state": "CONFIRMED" if found and confirmed == len(found) else "DRAFT",
+        "found": len(found),
+        "expected": len(expected_ids),
+        "confirmed": confirmed,
+        "url": "/documents/#/requirements",
+    }
+
+
+async def _verify_infra(call, token: str, draft: dict) -> dict:
+    workspace_id = _created(draft, "infra", "workspace")[0]["result"]["workspace_id"]
+    design_id = _created(draft, "infra", "design")[0]["result"]["design_id"]
+    workspace, design = await asyncio.gather(
+        call("infra", "GET", f"v1/workspaces/{workspace_id}", token),
+        call("infra", "GET", f"v1/designs/{design_id}", token),
+    )
+    linked = (workspace.get("workspace") or {}).get("currentDesignId") == design_id
+    status = (design.get("design") or {}).get("status", "UNKNOWN")
+    return {
+        "verified": linked and bool(design.get("design")),
+        "state": status,
+        "workspace_id": workspace_id,
+        "design_id": design_id,
+        "linked": linked,
+        "url": "/infra/",
+    }
+
 
 async def _pm_project(call, token, draft):
     r = await call(
@@ -343,6 +504,8 @@ async def _qa_case(call, token, slug, revision_id, case, index):
             "priority": case.get("priority", "MEDIUM"),
             "action_md": case.get("description", "Execute the described scenario."),
             "expected_result_md": case.get("expected_result", "The requirement is satisfied."),
+            "category": case.get("category", "FUNCTIONAL"),
+            "negative_path": bool(case.get("negative_path", False)),
             "sequence_no": index + 1,
         },
     )
@@ -367,6 +530,10 @@ async def _document_project(call, token, draft, draft_id):
 
 
 async def _document_requirement(call, token, project_id, requirement, draft_id):
+    criteria = requirement.get("acceptance_criteria") or []
+    description = requirement.get("description", "")
+    if criteria:
+        description += "\n\nAcceptance criteria:\n" + "\n".join(f"- {item}" for item in criteria)
     r = await call(
         "document",
         "POST",
@@ -374,7 +541,9 @@ async def _document_requirement(call, token, project_id, requirement, draft_id):
         token,
         body={
             "project_id": project_id,
-            **requirement,
+            "title": requirement["title"],
+            "description": description,
+            "priority": requirement.get("priority", "SHOULD"),
             "source_type": "OIDA_AI",
             "source_reference": draft_id,
         },

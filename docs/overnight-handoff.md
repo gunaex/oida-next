@@ -1,5 +1,22 @@
 # Overnight continuation — 2026-09-05
 
+## ACTIVE — closed-loop dashboard phase, 2026-09-07
+
+User authorized the full next phase and asked that all code be committed and
+pushed. The existing continuation automation was updated in place, remains the
+only automation, targets this task, and is ACTIVE at 13:00 Asia/Bangkok.
+
+Implemented but not yet production accepted: durable full-loop verification for
+each approved AI draft. It reads exact stored IDs back from PM tasks, QA suites
+and cases, Document requirements, and Infra workspace/design; reports workflow
+state and deep links; records each verification in SQLite; and displays the last
+PASS/FAIL result in the root dashboard. Provider output normalization now splits
+comma-packed Infra components, normalizes PM priority, adds QA category/negative
+path fields, and appends measurable acceptance criteria to Document records.
+Current validation: 58 pytest, Ruff, Mypy, JavaScript syntax and 9 Pages gateway
+tests pass. Next: deploy and production-check both accepted sample projects,
+then implement governed post-approval revision/diff before final push.
+
 ## COMPLETE — production AI orchestration accepted, 2026-09-07
 
 The original requested workflow is live at https://oida-next.kanphong.com:

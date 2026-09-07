@@ -67,11 +67,11 @@ Return this JSON object:
   "assumptions": ["explicit assumption"],
   "risks": ["material risk"],
   "pm_tasks": [{{"title":"...","description":"...","phase":"Planning|UR|DR|DN|ST|UT|IP","priority":"High|Med|Low"}}],
-  "qa_suites": [{{"name":"...","description":"...","suite_type":"SMOKE|INTEGRATION|REGRESSION|UAT|OTHER","test_cases":[{{"title":"...","description":"...","expected_result":"...","priority":"HIGH|MEDIUM|LOW"}}]}}],
-  "document_requirements": [{{"title":"...","description":"...","priority":"MUST|SHOULD|COULD"}}],
+  "qa_suites": [{{"name":"...","description":"...","suite_type":"SMOKE|INTEGRATION|REGRESSION|UAT|OTHER","test_cases":[{{"title":"...","description":"...","expected_result":"...","priority":"HIGH|MEDIUM|LOW","category":"FUNCTIONAL|SECURITY|PERFORMANCE|RECOVERY","negative_path":false}}]}}],
+  "document_requirements": [{{"title":"...","description":"...","acceptance_criteria":["measurable outcome"],"priority":"MUST|SHOULD|COULD"}}],
   "infra": {{"provider":"AWS|GCP|ON_PREM","platform":"KUBERNETES|NATIVE_VM|OPENSHIFT_OCP","components":["..."],"rationale":"..."}}
 }}
-Create 4-12 PM tasks, 3-8 QA suites with 2-8 cases each, and 5-20 atomic document requirements. Keep all values specific to the supplied requirement."""
+Create 4-12 PM tasks, 3-8 QA suites with 2-8 cases each, and 5-20 atomic document requirements. Include negative, security, performance, and recovery coverage where relevant. Return infrastructure components as separate array items, never one comma-separated item. Give every requirement measurable acceptance criteria. Keep all values specific to the supplied requirement."""
     return system, user
 
 
@@ -120,6 +120,9 @@ def validate_plan(value: dict) -> dict:
             for k in ("title", "description", "phase", "priority")
         ):
             raise ValueError("AI plan contains an invalid PM task")
+        task["priority"] = {"Medium": "Med", "MEDIUM": "Med"}.get(
+            task["priority"], task["priority"]
+        )
     for suite in value["qa_suites"]:
         if (
             not isinstance(suite, dict)
@@ -133,9 +136,14 @@ def validate_plan(value: dict) -> dict:
                 for key in ("title", "description", "expected_result", "priority")
             ):
                 raise ValueError("AI plan contains an invalid QA case")
+            case.setdefault("category", "FUNCTIONAL")
+            case.setdefault("negative_path", False)
     for requirement in value["document_requirements"]:
         if not isinstance(requirement, dict) or not isinstance(requirement.get("title"), str):
             raise TypeError("AI plan contains an invalid document requirement")
+        criteria = requirement.setdefault("acceptance_criteria", [])
+        if not criteria:
+            requirement["acceptance_criteria"] = [requirement.get("description", "Requirement met")]
     infra = value["infra"]
     if (
         not isinstance(infra, dict)
@@ -143,6 +151,12 @@ def validate_plan(value: dict) -> dict:
         or not infra["components"]
     ):
         raise ValueError("AI plan contains an invalid infrastructure brief")
+    if len(infra["components"]) == 1 and "," in infra["components"][0]:
+        infra["components"] = [
+            component.strip()
+            for component in infra["components"][0].split(",")
+            if component.strip()
+        ]
     return value
 
 

@@ -29,6 +29,28 @@ function targetCard(name, record) {
   return card;
 }
 
+function renderVerification(verification) {
+  const section = node("div", undefined, "live-check");
+  const heading = node("div", undefined, "section-title");
+  heading.append(
+    node("strong", "Full-loop verification"),
+    node("span", verification.healthy ? "PASS" : "FAIL", `badge ${verification.healthy ? "success" : "failure"}`)
+  );
+  const modules = node("div", undefined, "live-grid");
+  for (const name of ["pm", "qa", "document", "infra"]) {
+    const value = verification.modules[name];
+    const card = node("a", undefined, "live-module"); card.href = value.url || "#";
+    card.append(node("strong", moduleNames[name]), node("span", value.state || "UNKNOWN"));
+    if (name === "qa" && value.suites) card.append(node("small", `${value.suites.found}/${value.suites.expected} suites · ${value.cases.found}/${value.cases.expected} cases`));
+    else if (value.expected !== undefined) card.append(node("small", `${value.found}/${value.expected} records verified`));
+    else if (name === "infra") card.append(node("small", value.linked ? "Workspace linked to design" : "Workspace link missing"));
+    if (value.message) card.append(node("small", value.message, "draft-error"));
+    modules.append(card);
+  }
+  section.append(heading, modules, node("small", `Checked ${new Date(verification.checked * 1000).toLocaleString()}`, "muted"));
+  return section;
+}
+
 function renderDrafts(records) {
   const container = $("orchestrations"); container.replaceChildren();
   for (const record of records) {
@@ -68,6 +90,11 @@ function renderDrafts(records) {
       const targets = node("div", undefined, "target-grid");
       for (const name of ["pm", "qa", "document", "infra"]) targets.append(targetCard(name, record));
       card.append(targets);
+      if (record.verification) card.append(renderVerification(record.verification));
+      if (record.status === "APPROVED") card.append(workflowButton("Run full-loop check", async () => {
+        const result = await api(`/ai/drafts/${record.id}/verify`, "POST");
+        message(result.healthy ? "Full-loop check passed across all four workspaces." : "Full-loop check found a missing or unavailable record.");
+      }));
       if (record.status === "PARTIAL") card.append(workflowButton("Retry unfinished items", async () => {
         await api(`/ai/drafts/${record.id}/approve`, "POST", {plan_hash:record.plan_hash});
         message("Retry completed. Existing records were not duplicated.");

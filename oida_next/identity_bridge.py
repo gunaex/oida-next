@@ -251,7 +251,7 @@ def install_identity(
             if response.status_code >= 400:
                 raise HTTPException(response.status_code, f"{module.title()} rejected the request")
             value = response.json()
-            if not isinstance(value, dict):
+            if not isinstance(value, (dict, list)):
                 raise TypeError("Unexpected module response")
             return value
         except HTTPException:

@@ -20,7 +20,12 @@
 .settings-form { display:grid; grid-template-columns:1fr 1fr 1.5fr auto; gap:1rem; align-items:end; margin-top:1rem }
 .settings-form input,.settings-form select { margin-bottom:0 }
 .settings-form .muted { grid-column:1/-1 }
+.live-check { margin-top:1rem; padding-top:1rem; border-top:1px solid #2e3c50 }
+.live-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:.6rem; margin:.75rem 0 }
+.live-module { display:flex; flex-direction:column; gap:.25rem; color:#dce7f5; text-decoration:none; padding:.75rem; border:1px solid #334255; border-radius:6px }
+.live-module:hover { border-color:#57dbc3 }
+.live-module span,.live-module small { color:#99a8be }
 details#advanced { margin-top:2.5rem; border-top:1px solid #283243; padding-top:1rem }
 details#advanced>summary { cursor:pointer; color:#99a8be }
 .advanced-body { padding-top:1.5rem }
-@media(max-width:720px) { .module-grid,.target-grid,.settings-form { grid-template-columns:1fr } }
+@media(max-width:720px) { .module-grid,.target-grid,.settings-form,.live-grid { grid-template-columns:1fr } }
