@@ -4,7 +4,7 @@ import json
 import httpx
 from fastapi.testclient import TestClient
 
-from oida_next.ai_runtime import _json_object, generate_plan, validate_plan
+from oida_next.ai_runtime import _json_object, generate_plan, probe_provider, validate_plan
 from oida_next.control import create_app
 
 
@@ -125,3 +125,13 @@ def test_deepseek_provider_uses_server_key_and_returns_validated_plan(tmp_path):
     )
     assert result["summary"] == "Plan"
     assert (provider, model) == ("deepseek", "deepseek-chat")
+
+    def probe_upstream(request):
+        assert request.url == "https://api.deepseek.com/chat/completions"
+        assert request.headers["authorization"] == "Bearer server-only-key"
+        return httpx.Response(200, json={"choices": [{"message": {"content": "OK"}}]})
+
+    probe = asyncio.run(
+        probe_provider(app.state.store, transport=httpx.MockTransport(probe_upstream))
+    )
+    assert probe == {"healthy": True, "provider": "deepseek", "model": "deepseek-chat"}

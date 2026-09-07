@@ -446,12 +446,9 @@ def install_ai_workflow(app, store, operator):
                     (draft_id,),
                 )
             }
-            retrying_completed_revision = (
-                draft["status"] == "APPROVED" and bool(failed_modules)
-            )
+            retrying_completed_revision = draft["status"] == "APPROVED" and bool(failed_modules)
             if not draft["parent_id"] or (
-                draft["status"] not in {"DRAFT", "PARTIAL"}
-                and not retrying_completed_revision
+                draft["status"] not in {"DRAFT", "PARTIAL"} and not retrying_completed_revision
             ):
                 raise HTTPException(409, "Revision is not awaiting approval")
             if retrying_completed_revision and not modules.issubset(failed_modules):
@@ -530,6 +527,8 @@ def install_ai_workflow(app, store, operator):
             raise HTTPException(401, "OIDA identity is unavailable")
         with store.tx() as db:
             draft = view(db, draft_id)
+            if draft["parent_id"]:
+                draft["_parent"] = view(db, draft["parent_id"])
         if draft["status"] != "APPROVED":
             raise HTTPException(409, "Only approved work can run a full-loop check")
         call, token = app.state.module_json, connection["token"]
@@ -697,18 +696,26 @@ async def _safe_check(module: str, checker, call, token: str, draft: dict) -> di
 
 
 async def _verify_pm(call, token: str, draft: dict) -> dict:
-    project = _created(draft, "pm", "project")[0]["result"]
+    parent = draft.get("_parent")
+    project = _created(parent or draft, "pm", "project")[0]["result"]
+    prefix = "revision-task-" if parent else "task-"
     expected_ids = {
         item["result"]["task_id"]
         for item in _created(draft, "pm")
-        if item["key"].startswith("task-")
+        if item["key"].startswith(prefix)
     }
     tasks = await call("pm", "GET", f"{project['slug']}/tasks", token)
     found = [task for task in tasks if task.get("id") in expected_ids]
     done = sum(task.get("status") == "Done" for task in found)
     return {
         "verified": len(found) == len(expected_ids),
-        "state": "DONE" if found and done == len(found) else "IN_PROGRESS",
+        "state": (
+            "NO_CHANGES"
+            if not expected_ids
+            else "DONE"
+            if done == len(found) == len(expected_ids)
+            else "IN_PROGRESS"
+        ),
         "found": len(found),
         "expected": len(expected_ids),
         "done": done,
@@ -717,21 +724,25 @@ async def _verify_pm(call, token: str, draft: dict) -> dict:
 
 
 async def _verify_qa(call, token: str, draft: dict) -> dict:
-    project = _created(draft, "qa", "project")[0]["result"]
+    parent = draft.get("_parent")
+    project = _created(parent or draft, "qa", "project")[0]["result"]
+    suite_prefix = "revision-suite-add-" if parent else "suite-"
+    case_prefix = "revision-case-" if parent else "case-"
+    revision_prefix = "revision-script-" if parent else "revision-"
     suite_ids = {
         item["result"]["suite_id"]
         for item in _created(draft, "qa")
-        if item["key"].startswith("suite-")
+        if item["key"].startswith(suite_prefix)
     }
     case_ids = {
         item["result"]["case_id"]
         for item in _created(draft, "qa")
-        if item["key"].startswith("case-")
+        if item["key"].startswith(case_prefix)
     }
     revision_ids = [
         item["result"]["revision_id"]
         for item in _created(draft, "qa")
-        if item["key"].startswith("revision-")
+        if item["key"].startswith(revision_prefix)
     ]
     suites = await call("qa", "GET", f"{project['slug']}/suites", token)
     found_suites = [suite for suite in suites if suite.get("id") in suite_ids]
@@ -753,12 +764,25 @@ async def _verify_qa(call, token: str, draft: dict) -> dict:
 
 
 async def _verify_document(call, token: str, draft: dict) -> dict:
-    project = _created(draft, "document", "project")[0]["result"]
-    expected_ids = {
-        item["result"]["requirement_id"]
-        for item in _created(draft, "document")
-        if item["key"].startswith("requirement-")
-    }
+    parent = draft.get("_parent")
+    project = _created(parent or draft, "document", "project")[0]["result"]
+    if parent:
+        expected_ids = {
+            item["result"]["requirement_id"]
+            for item in _created(draft, "document")
+            if item["key"].startswith("revision-requirement-add-")
+        }
+        expected_ids.update(
+            item["key"].removeprefix("revision-requirement-update-")
+            for item in _created(draft, "document")
+            if item["key"].startswith("revision-requirement-update-")
+        )
+    else:
+        expected_ids = {
+            item["result"]["requirement_id"]
+            for item in _created(draft, "document")
+            if item["key"].startswith("requirement-")
+        }
     requirements = await call(
         "document", "GET", f"projects/{project['project_id']}/requirements", token
     )
@@ -775,8 +799,10 @@ async def _verify_document(call, token: str, draft: dict) -> dict:
 
 
 async def _verify_infra(call, token: str, draft: dict) -> dict:
-    workspace_id = _created(draft, "infra", "workspace")[0]["result"]["workspace_id"]
-    design_id = _created(draft, "infra", "design")[0]["result"]["design_id"]
+    parent = draft.get("_parent")
+    workspace_id = _created(parent or draft, "infra", "workspace")[0]["result"]["workspace_id"]
+    design_key = "revision-design" if parent else "design"
+    design_id = _created(draft, "infra", design_key)[0]["result"]["design_id"]
     workspace, design = await asyncio.gather(
         call("infra", "GET", f"v1/workspaces/{workspace_id}", token),
         call("infra", "GET", f"v1/designs/{design_id}", token),
@@ -860,9 +886,10 @@ async def _qa_revision_numbered(call, token, slug, suite_id, draft):
 
 async def _qa_case(call, token, slug, revision_id, case, index):
     negative_path = bool(case.get("negative_path", False))
-    if "negative" in case.get("title", "").lower() or "unauthorized" in case.get(
-        "description", ""
-    ).lower():
+    if (
+        "negative" in case.get("title", "").lower()
+        or "unauthorized" in case.get("description", "").lower()
+    ):
         negative_path = True
     r = await call(
         "qa",

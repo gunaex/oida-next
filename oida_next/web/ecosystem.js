@@ -90,7 +90,7 @@ function renderDrafts(records) {
     const statusClass = record.status === "APPROVED" ? "success" : record.status === "PARTIAL" ? "failure" : "wait";
     heading.append(node("h3", record.title), node("span", record.status, `badge ${statusClass}`));
     const counts = node("div", undefined, "draft-summary");
-    if (record.status === "GENERATING") counts.append(node("span", "Local AI is preparing the draft…"));
+    if (record.status === "GENERATING") counts.append(node("span", "AI provider is preparing the draft…"));
     else if (record.status === "FAILED") counts.append(node("span", record.error || "AI generation failed", "draft-error"));
     else counts.append(
       node("span", `${record.plan.pm_tasks.length} PM tasks`),
@@ -141,7 +141,7 @@ function renderDrafts(records) {
       for (const name of ["pm", "qa", "document", "infra"]) targets.append(targetCard(name, record));
       card.append(targets);
       if (record.verification) card.append(renderVerification(record.verification));
-      if (record.status === "APPROVED" && !record.parent_id) card.append(workflowButton("Run full-loop check", async () => {
+      if (record.status === "APPROVED") card.append(workflowButton("Run full-loop check", async () => {
         const result = await api(`/ai/drafts/${record.id}/verify`, "POST");
         message(result.healthy ? "Full-loop check passed across all four workspaces." : "Full-loop check found a missing or unavailable record.");
       }));
@@ -199,6 +199,16 @@ $("ai-settings-form").onsubmit = async event => {
     $("ai-key").value = ""; message("AI provider settings saved."); await loadWorkspace();
   } catch (error) { message(error.message); }
   finally { button.disabled = false; }
+};
+
+$("ai-test").onclick = async () => {
+  const button = $("ai-test"); button.disabled = true; $("ai-test-state").textContent = "Testing…";
+  try {
+    const result = await api("/ai/settings/test", "POST");
+    $("ai-test-state").textContent = `${result.provider} · ${result.model} · connection passed`;
+  } catch (error) {
+    $("ai-test-state").textContent = error.message;
+  } finally { button.disabled = false; }
 };
 
 new MutationObserver(() => {

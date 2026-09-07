@@ -1,5 +1,31 @@
 # Overnight continuation — 2026-09-05
 
+## COMPLETE — DeepSeek full loop and operator checks, 2026-09-07 13:50 Bangkok
+
+DeepSeek is the active production provider with model `deepseek-chat`; its key
+remains server-only. The new `Test connection` action performs a bounded provider
+probe and reports provider/model health without exposing credentials. Production
+returned `deepseek · deepseek-chat · connection passed`.
+
+The real `DeepSeek Full Loop Acceptance` project was generated through the OIDA
+UI, reviewed, exact-hash approved, distributed, and read back from all modules.
+The stored verification is PASS: 12/12 PM tasks, 7/7 QA suites, 24/24 QA cases,
+16/16 Document requirements, and an Infra workspace linked to its design. The
+DeepSeek draft contains security, negative authorization, performance, recovery,
+and measurable acceptance coverage.
+
+Approved revisions now expose their own `Run full-loop check`. The accepted Data
+Platform revision passed production verification against its parent workspaces:
+6/6 changed PM records, 2/2 added QA suites, 8/8 revision cases, 8/8 changed or
+added Document requirements, and the revised Infra design linked to the existing
+workspace. The provider UI no longer calls all generation `Local AI`.
+
+Production Pages release is `a86d9af4` with all four module bundles included.
+Backend is READY after restart and the browser session survived. Validation:
+58 pytest, Ruff, Mypy across 17 source files, JavaScript syntax, and all 9 Pages
+gateway tests pass. No additional product function is required for the approved
+OIDA orchestration scope; future work is optional operations refinement.
+
 ## COMPLETE — governed revision and visible DeepSeek settings, 2026-09-07 13:25 Bangkok
 
 Production revision `6162caed-cde0-48b5-9ada-2e782dcbe480` is APPROVED with

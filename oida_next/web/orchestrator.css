@@ -18,6 +18,7 @@
 #ai-settings { margin:-.75rem 0 2rem; border:1px solid #3f79c6; border-radius:7px; padding:1rem; background:#101a29 }
 #ai-settings>summary { cursor:pointer; color:#e5efff; font-weight:700 }
 .settings-help { margin:.75rem 0 0; color:#aebdd2 }
+.settings-actions { display:flex; gap:.65rem; align-items:center }
 .settings-form { display:grid; grid-template-columns:1fr 1fr 1.5fr auto; gap:1rem; align-items:end; margin-top:1rem }
 .settings-form input,.settings-form select { margin-bottom:0 }
 .settings-form .muted { grid-column:1/-1 }

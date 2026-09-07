@@ -207,3 +207,9 @@ def test_draft_requires_reviewed_hash_and_distributes_every_generated_item(tmp_p
     assert revised.status_code == 200
     assert revised.json()["status"] == "APPROVED"
     assert revised.json()["selected_modules"] == ["document", "infra", "pm", "qa"]
+
+    revision_check = client.post(f"/api/v1/ai/drafts/{revision['id']}/verify")
+    assert revision_check.status_code == 200
+    assert revision_check.json()["healthy"] is True
+    assert revision_check.json()["modules"]["pm"]["expected"] == 1
+    assert revision_check.json()["modules"]["qa"]["cases"]["expected"] == 1

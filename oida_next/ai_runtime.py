@@ -146,9 +146,7 @@ def validate_plan(value: dict) -> dict:
                 raise ValueError("AI plan contains an invalid QA case")
             case.setdefault("category", "FUNCTIONAL")
             case.setdefault("negative_path", False)
-            if "negative" in case["title"].lower() or "unauthorized" in case[
-                "description"
-            ].lower():
+            if "negative" in case["title"].lower() or "unauthorized" in case["description"].lower():
                 case["negative_path"] = True
     for requirement in value["document_requirements"]:
         if not isinstance(requirement, dict) or not isinstance(requirement.get("title"), str):
@@ -217,6 +215,38 @@ async def generate_plan(
         raise HTTPException(502, f"AI planning failed: {type(exc).__name__}") from None
 
 
+async def probe_provider(store, transport=None) -> dict:
+    config = _config(store)
+    try:
+        async with httpx.AsyncClient(transport=transport, timeout=30, trust_env=False) as client:
+            if config.provider == "local":
+                response = await client.get(LOCAL_BASE + "/api/tags")
+            else:
+                if not config.api_key:
+                    raise HTTPException(409, "DeepSeek API key is not configured")
+                response = await client.post(
+                    DEEPSEEK_BASE + "/chat/completions",
+                    headers={"Authorization": "Bearer " + config.api_key},
+                    json={
+                        "model": config.model,
+                        "messages": [{"role": "user", "content": "Reply with OK only."}],
+                        "max_tokens": 8,
+                        "temperature": 0,
+                        "stream": False,
+                    },
+                )
+            response.raise_for_status()
+        return {"healthy": True, "provider": config.provider, "model": config.model}
+    except HTTPException:
+        raise
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            502, f"AI provider rejected the connection ({exc.response.status_code})"
+        ) from None
+    except httpx.HTTPError as exc:
+        raise HTTPException(502, f"AI provider connection failed: {type(exc).__name__}") from None
+
+
 def install_ai(app, store, operator):
     @app.get("/api/v1/ai/settings", dependencies=[Depends(operator)])
     def settings():
@@ -247,6 +277,10 @@ def install_ai(app, store, operator):
             "model": config.model,
             "has_api_key": bool(config.api_key),
         }
+
+    @app.post("/api/v1/ai/settings/test", dependencies=[Depends(operator)])
+    async def test_connection():
+        return await probe_provider(store)
 
     @app.post("/api/v1/ai/plan", dependencies=[Depends(operator)])
     async def plan(body: AIPlanRequest):
