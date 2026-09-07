@@ -196,8 +196,10 @@ def create_app(
         # Host exposure is intentionally controlled by deployment, never trust forwarded headers.
         from .module_gateway import MAX_UPLOAD
 
-        module_proxy = any(request.url.path.startswith(f"/api/v1/modules/{name}/proxy/")
-                           for name in ("pm", "qa", "document", "infra"))
+        module_proxy = any(
+            request.url.path.startswith(f"/api/v1/modules/{name}/proxy/")
+            for name in ("pm", "qa", "document", "infra")
+        )
         limit = MAX_UPLOAD if module_proxy else 100000
         try:
             size = int(request.headers.get("content-length", "0"))
@@ -413,6 +415,9 @@ def create_app(
     from .identity_bridge import install_identity
 
     install_identity(app, operator, identity_config, identity_transport, store, event)
+    from .ai_runtime import install_ai
+
+    install_ai(app, store, operator)
 
     @app.get("/api/v1/models")
     def models(actor=Depends(operator)):
