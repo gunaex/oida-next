@@ -1,5 +1,34 @@
 # Overnight continuation — 2026-09-05
 
+## COMPLETE — production AI orchestration accepted, 2026-09-07
+
+The original requested workflow is live at https://oida-next.kanphong.com:
+one OIDA login, configurable Local LLM or DeepSeek, requirement intake, durable
+AI draft, human JSON edit/review, exact-hash approval, and idempotent distribution
+of every generated item to PM, QA, Document and canonical Infra. Local generation
+runs as a background task so Cloudflare's request timeout does not interrupt it;
+the UI polls and shows GENERATING, DRAFT, PARTIAL or APPROVED.
+
+Production Local AI acceptance used `mistral:latest`. ERP Project — AI Complete
+created 9 PM tasks, 5 QA suites with 6 cases, 5 Document requirements, and one
+Infra workspace/design/flow. Data Platform Project — AI Complete created 7 PM
+tasks, 3 QA suites with 6 cases, 6 Document requirements, and one Infra
+workspace/design/flow. Both show APPROVED with PM/QA/Document/Infra CREATED.
+The ERP run exposed an Infra flow persistence bug; it was fixed in canonical
+Infra commit `38ff645`, regression-tested, deployed, and the item-only retry
+completed without duplicating successful module records.
+
+After an OIDA restart, both approvals and per-item results remained present,
+automatic owner SSO reconnected, PM showed all 9 ERP tasks, QA showed all 5 ERP
+suites, Document listed both AI projects, and Infra opened the linked Data
+Platform workspace/design. All OIDA/Account/Document/Infra services are active;
+PM and QA containers are healthy. OIDA validation: 58 pytest, Ruff, Mypy and 9
+Pages gateway tests pass. Production Pages release:
+https://593846c1.oida-next.pages.dev. OIDA commits: `ac855fd`, `fb34806` plus the
+final checkpoint/test commit. The one existing continuation automation remains
+at 13:00 Asia/Bangkok and is PAUSED because acceptance is complete; no duplicate
+was created and no usage-reset credit was consumed.
+
 ## ACTIVE — governed AI workflow ready for production deployment, 2026-09-07
 
 OIDA now has a real server-side AI workflow using configurable local Ollama or

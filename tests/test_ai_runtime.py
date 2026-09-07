@@ -1,6 +1,10 @@
+import asyncio
+import json
+
+import httpx
 from fastapi.testclient import TestClient
 
-from oida_next.ai_runtime import _json_object, validate_plan
+from oida_next.ai_runtime import _json_object, generate_plan, validate_plan
 from oida_next.control import create_app
 
 
@@ -45,8 +49,6 @@ def sample_plan():
 
 
 def test_structured_plan_accepts_fenced_json_and_rejects_missing_sections():
-    import json
-
     assert (
         validate_plan(_json_object("```json\n" + json.dumps(sample_plan()) + "\n```"))["summary"]
         == "Plan"
@@ -76,3 +78,31 @@ def test_ai_settings_never_return_deepseek_key(tmp_path):
     assert response.json()["has_api_key"] is True
     assert secret not in response.text
     assert secret not in client.get("/api/v1/ai/settings").text
+
+
+def test_deepseek_provider_uses_server_key_and_returns_validated_plan(tmp_path):
+    app = create_app(tmp_path / "deepseek.db")
+    app.state.store.initialize_password("owner-password-long-enough")
+    with app.state.store.tx() as db:
+        db.execute("INSERT INTO settings VALUES('ai_provider','deepseek')")
+        db.execute("INSERT INTO settings VALUES('ai_model','deepseek-chat')")
+        db.execute("INSERT INTO settings VALUES('ai_deepseek_key','server-only-key')")
+
+    def upstream(request):
+        assert request.url == "https://api.deepseek.com/chat/completions"
+        assert request.headers["authorization"] == "Bearer server-only-key"
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": json.dumps(sample_plan())}}]},
+        )
+
+    result, provider, model = asyncio.run(
+        generate_plan(
+            app.state.store,
+            "Delivery",
+            "Build the governed workflow",
+            transport=httpx.MockTransport(upstream),
+        )
+    )
+    assert result["summary"] == "Plan"
+    assert (provider, model) == ("deepseek", "deepseek-chat")
