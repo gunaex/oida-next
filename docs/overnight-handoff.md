@@ -1,5 +1,22 @@
 # Overnight continuation — 2026-09-05
 
+## COMPLETE — operational cleanup accepted, 2026-09-07 14:10 Bangkok
+
+The unused QA project `data-platform-project-ai-complete-2`, created by the
+pre-fix revision retry, is archived rather than deleted. QA master storage was
+backed up first to `master-before-archive-20260907-140631.db`; SQLite integrity
+is `ok`, all per-project history remains on disk, and the duplicate is absent
+from the default QA project list.
+
+The local agent was offline after the OIDA backend restart because its encrypted
+identity is unlocked only when the operator enters the OIDA password; session
+resume intentionally does not retain that password. The operator signed in
+again, the `kanphong-ASUS-Ai` heartbeat returned online, and a production
+read-only `Inspect system` Advanced operation completed with status SUCCEEDED.
+No service or source change was needed. DeepSeek and all full-loop checks remain
+healthy, and the continuation automation remains paused because acceptance is
+complete.
+
 ## COMPLETE — DeepSeek full loop and operator checks, 2026-09-07 13:50 Bangkok
 
 DeepSeek is the active production provider with model `deepseek-chat`; its key
