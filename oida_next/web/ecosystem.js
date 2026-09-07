@@ -37,7 +37,9 @@ function renderDrafts(records) {
     const statusClass = record.status === "APPROVED" ? "success" : record.status === "PARTIAL" ? "failure" : "wait";
     heading.append(node("h3", record.title), node("span", record.status, `badge ${statusClass}`));
     const counts = node("div", undefined, "draft-summary");
-    counts.append(
+    if (record.status === "GENERATING") counts.append(node("span", "Local AI is preparing the draft…"));
+    else if (record.status === "FAILED") counts.append(node("span", record.error || "AI generation failed", "draft-error"));
+    else counts.append(
       node("span", `${record.plan.pm_tasks.length} PM tasks`),
       node("span", `${record.plan.qa_suites.length} QA suites`),
       node("span", `${record.plan.document_requirements.length} requirements`),
@@ -123,3 +125,7 @@ new MutationObserver(() => {
   if (!$("workspace").hidden && token) loadWorkspace().catch(error => message(error.message));
   else $("orchestrations").replaceChildren();
 }).observe($("workspace"), {attributes:true, attributeFilter:["hidden"]});
+
+setInterval(() => {
+  if (!$("workspace").hidden && token) loadWorkspace().catch(error => message(error.message));
+}, 5000);

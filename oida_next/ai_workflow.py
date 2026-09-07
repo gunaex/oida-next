@@ -5,7 +5,7 @@ import json
 import time
 import uuid
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, HTTPException, Request
 from pydantic import Field
 
 from .ai_runtime import generate_plan, validate_plan
@@ -39,13 +39,16 @@ def install_ai_workflow(app, store, operator):
                 id TEXT PRIMARY KEY,title TEXT NOT NULL,requirement TEXT NOT NULL,
                 provider TEXT NOT NULL,model TEXT NOT NULL,plan TEXT NOT NULL,
                 plan_hash TEXT NOT NULL,status TEXT NOT NULL,idempotency TEXT UNIQUE NOT NULL,
-                request_hash TEXT NOT NULL,created REAL NOT NULL,updated REAL NOT NULL);
+                request_hash TEXT NOT NULL,error TEXT,created REAL NOT NULL,updated REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS ai_draft_items(
                 draft_id TEXT NOT NULL,module TEXT NOT NULL,item_key TEXT NOT NULL,
                 status TEXT NOT NULL,result TEXT,error TEXT,updated REAL NOT NULL,
                 PRIMARY KEY(draft_id,module,item_key),
                 FOREIGN KEY(draft_id) REFERENCES ai_drafts(id));
         """)
+        columns = {row[1] for row in db.execute("PRAGMA table_info(ai_drafts)")}
+        if "error" not in columns:
+            db.execute("ALTER TABLE ai_drafts ADD COLUMN error TEXT")
 
     def view(db, draft_id):
         row = db.execute("SELECT * FROM ai_drafts WHERE id=?", (draft_id,)).fetchone()
@@ -64,6 +67,7 @@ def install_ai_workflow(app, store, operator):
             "plan": json.loads(row["plan"]),
             "plan_hash": row["plan_hash"],
             "status": row["status"],
+            "error": row["error"],
             "created": row["created"],
             "updated": row["updated"],
             "items": [
@@ -86,8 +90,24 @@ def install_ai_workflow(app, store, operator):
             ]
             return [view(db, item) for item in ids]
 
+    async def generate_draft(draft_id: str, title: str, requirement: str):
+        try:
+            plan, provider, model = await generate_plan(store, title, requirement)
+            with store.tx() as db:
+                db.execute(
+                    "UPDATE ai_drafts SET provider=?,model=?,plan=?,plan_hash=?,"
+                    "status='DRAFT',error=NULL,updated=? WHERE id=?",
+                    (provider, model, json.dumps(plan), _digest(plan), time.time(), draft_id),
+                )
+        except HTTPException as exc:
+            with store.tx() as db:
+                db.execute(
+                    "UPDATE ai_drafts SET status='FAILED',error=?,updated=? WHERE id=?",
+                    (str(exc.detail), time.time(), draft_id),
+                )
+
     @app.post("/api/v1/ai/drafts", dependencies=[Depends(operator)])
-    async def create_draft(body: DraftCreate):
+    async def create_draft(body: DraftCreate, tasks: BackgroundTasks):
         title, requirement = body.title.strip(), body.requirement.strip()
         request_hash = _digest({"title": title, "requirement": requirement})
         with store.tx() as db:
@@ -98,27 +118,31 @@ def install_ai_workflow(app, store, operator):
                 if old["request_hash"] != request_hash:
                     raise HTTPException(409, "Idempotency key already used")
                 return view(db, old["id"])
-        plan, provider, model = await generate_plan(store, title, requirement)
-        now, draft_id, plan_hash = time.time(), str(uuid.uuid4()), _digest(plan)
+        now, draft_id = time.time(), str(uuid.uuid4())
         with store.tx() as db:
             db.execute(
-                "INSERT INTO ai_drafts VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO ai_drafts(id,title,requirement,provider,model,plan,plan_hash,"
+                "status,idempotency,request_hash,error,created,updated) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     draft_id,
                     title,
                     requirement,
-                    provider,
-                    model,
-                    json.dumps(plan),
-                    plan_hash,
-                    "DRAFT",
+                    "pending",
+                    "pending",
+                    "{}",
+                    "0" * 64,
+                    "GENERATING",
                     body.idempotency_key,
                     request_hash,
+                    None,
                     now,
                     now,
                 ),
             )
-            return view(db, draft_id)
+            result = view(db, draft_id)
+        tasks.add_task(generate_draft, draft_id, title, requirement)
+        return result
 
     @app.put("/api/v1/ai/drafts/{draft_id}", dependencies=[Depends(operator)])
     def update_draft(draft_id: str, body: DraftUpdate):

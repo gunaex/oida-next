@@ -98,7 +98,8 @@ def test_draft_requires_reviewed_hash_and_distributes_every_generated_item(tmp_p
         },
     )
     assert created.status_code == 200
-    draft = created.json()
+    assert created.json()["status"] == "GENERATING"
+    draft = client.get("/api/v1/ai/drafts").json()[0]
     assert draft["status"] == "DRAFT"
     assert calls == []
 
