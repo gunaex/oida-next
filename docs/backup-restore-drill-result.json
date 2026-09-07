@@ -1,0 +1,175 @@
+{
+  "healthy": true,
+  "run_directory": "/home/kanphong/services/oida-next/backups/restore-drill-20260907-141546",
+  "database_count": 21,
+  "databases": [
+    {
+      "database": "01-oida-control-control.db",
+      "service": "oida-control",
+      "sha256": "fdcd7a2ec3d463435ec875029ac44b6e4432141d049c5bf394241c4a81dfb74d",
+      "integrity": "ok",
+      "tables": 19,
+      "row_counts_match": true
+    },
+    {
+      "database": "02-oida-agent-journal-journal.db",
+      "service": "oida-agent-journal",
+      "sha256": "e682ee1e18bb7bc04a1f98d8c46cc7095bd696f40f95e6a6e01b8f5f6dbe6c38",
+      "integrity": "ok",
+      "tables": 1,
+      "row_counts_match": true
+    },
+    {
+      "database": "03-account-account.db",
+      "service": "account",
+      "sha256": "79db950c74bd25514722b6af3aebb8626681784e739eaef19d86346cd164ff73",
+      "integrity": "ok",
+      "tables": 16,
+      "row_counts_match": true
+    },
+    {
+      "database": "04-pm-master.db",
+      "service": "pm",
+      "sha256": "f2d94d736dc0da6f8aee69f5930d6374f48edeb2666d42d14ac34895e7252fdd",
+      "integrity": "ok",
+      "tables": 10,
+      "row_counts_match": true
+    },
+    {
+      "database": "05-pm-data-platform-project-ai-complete-2.db",
+      "service": "pm",
+      "sha256": "b368d03e55477cf8ad0caf44f1c89379e7be8f49d145a2d2a8ddc006b26acc1f",
+      "integrity": "ok",
+      "tables": 21,
+      "row_counts_match": true
+    },
+    {
+      "database": "06-pm-data-platform-project-ai-complete.db",
+      "service": "pm",
+      "sha256": "a7420d806c376b435c1b166e655fc47af54e7660ded85a5284097a138c817350",
+      "integrity": "ok",
+      "tables": 21,
+      "row_counts_match": true
+    },
+    {
+      "database": "07-pm-data-platform-project.db",
+      "service": "pm",
+      "sha256": "64920a6e01394f2f9c0af374e43dc6d2eeab922debfe38b4405f6b0977ab7ed5",
+      "integrity": "ok",
+      "tables": 21,
+      "row_counts_match": true
+    },
+    {
+      "database": "08-pm-deepseek-full-loop-acceptance.db",
+      "service": "pm",
+      "sha256": "29c12b72ec4f2d7c8fd50463ad8b51b31cdb38d6f602d6d5cd9a9f47516c654b",
+      "integrity": "ok",
+      "tables": 21,
+      "row_counts_match": true
+    },
+    {
+      "database": "09-pm-erp-project-ai-complete.db",
+      "service": "pm",
+      "sha256": "5e57e355b283dbf8b93cdb5ba374261fb93e7019ebcb6ce640c7e5c03ad2a284",
+      "integrity": "ok",
+      "tables": 21,
+      "row_counts_match": true
+    },
+    {
+      "database": "10-pm-erp-project.db",
+      "service": "pm",
+      "sha256": "cca969369240e6abf7b7d80e59bd102667a477197265798c402838964e997285",
+      "integrity": "ok",
+      "tables": 21,
+      "row_counts_match": true
+    },
+    {
+      "database": "11-pm-oida-integration-acceptance-2026-09-07.db",
+      "service": "pm",
+      "sha256": "dc1344107ae451905cc45a865c2b05e45b5795eabc072cc9b1212c24e3ee8bb6",
+      "integrity": "ok",
+      "tables": 21,
+      "row_counts_match": true
+    },
+    {
+      "database": "12-qa-master.db",
+      "service": "qa",
+      "sha256": "2db8b3bff37563478afd783d0f105c1be8872a35501aed62ad4db3fe405011c9",
+      "integrity": "ok",
+      "tables": 5,
+      "row_counts_match": true
+    },
+    {
+      "database": "13-qa-data-platform-project-ai-complete-2.db",
+      "service": "qa",
+      "sha256": "2155306e3b46a886cd5dd9799fd2392f97d7d5fb69f0b8c18fb96a3fa0f6ee04",
+      "integrity": "ok",
+      "tables": 15,
+      "row_counts_match": true
+    },
+    {
+      "database": "14-qa-data-platform-project-ai-complete.db",
+      "service": "qa",
+      "sha256": "28b214f1c6f676f63a143ddb8800e66e4429279406573328effdf6794994f718",
+      "integrity": "ok",
+      "tables": 15,
+      "row_counts_match": true
+    },
+    {
+      "database": "15-qa-data-platform-project.db",
+      "service": "qa",
+      "sha256": "b3300eca503f68062fa58caeede39a0f60f00a1ddb028f9559f05e63dc740d5e",
+      "integrity": "ok",
+      "tables": 15,
+      "row_counts_match": true
+    },
+    {
+      "database": "16-qa-deepseek-full-loop-acceptance.db",
+      "service": "qa",
+      "sha256": "97d87bb1ed8886b61ebe1cb2bfbc7ba575d2492768a4f3fbb57ec5471b3a8a07",
+      "integrity": "ok",
+      "tables": 15,
+      "row_counts_match": true
+    },
+    {
+      "database": "17-qa-erp-project-ai-complete.db",
+      "service": "qa",
+      "sha256": "c605a9ba376e26131357b207df13183dc42932c5334de11f9d22beaf5ac38272",
+      "integrity": "ok",
+      "tables": 15,
+      "row_counts_match": true
+    },
+    {
+      "database": "18-qa-erp-project.db",
+      "service": "qa",
+      "sha256": "e6175ff46bff05306c9c8da81da65100ab57b119242dd08f322d92315f9145bd",
+      "integrity": "ok",
+      "tables": 15,
+      "row_counts_match": true
+    },
+    {
+      "database": "19-qa-oida-integration-acceptance-2026-09-07.db",
+      "service": "qa",
+      "sha256": "5e12dcbfc45dcaa3fcfa7756b9f0655734a62b958a99f2b651d2a5ddd0daeee9",
+      "integrity": "ok",
+      "tables": 15,
+      "row_counts_match": true
+    },
+    {
+      "database": "20-document-document.db",
+      "service": "document",
+      "sha256": "a040016ef29a1ab08b09373aac1610665f09b63d8c3b355daf1a48e166084fd0",
+      "integrity": "ok",
+      "tables": 60,
+      "row_counts_match": true
+    },
+    {
+      "database": "21-infra-infra-again.db",
+      "service": "infra",
+      "sha256": "cdd6285f826f2f4d623dfee1a99e105aa27c5b68a0a44694f62d564c70164a6b",
+      "integrity": "ok",
+      "tables": 16,
+      "row_counts_match": true
+    }
+  ]
+}

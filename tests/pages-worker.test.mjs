@@ -110,6 +110,17 @@ test('module page deep links resolve to the correct bundle', async () => {
   }
 });
 
+test('every public response receives browser security headers', async () => {
+  const response = await worker.fetch(new Request(host + '/'), {
+    ASSETS: {fetch: async () => new Response('home')},
+  });
+  assert.equal(response.headers.get('strict-transport-security'), 'max-age=31536000; includeSubDomains');
+  assert.equal(response.headers.get('x-frame-options'), 'DENY');
+  assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+  assert.equal(response.headers.get('permissions-policy'), 'camera=(), microphone=(), geolocation=()');
+  assert.match(response.headers.get('content-security-policy'), /frame-ancestors 'none'/);
+});
+
 test('module gateway remains disabled without explicit deployment setting', async () => {
   const response = await worker.fetch(new Request(host + '/modules/qa/api/projects'), {});
   assert.equal(response.status, 503);

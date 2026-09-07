@@ -12,6 +12,13 @@ Open the operator UI, unlock, select an online agent, state a supported goal or 
 
 `docs/dogfood-result.json` is real evidence from separate processes. The temporary demo is isolated from production databases. A physical phone and remote TLS path must still be exercised before claiming WAN/mobile acceptance.
 
+For a read-only authenticated production check, run
+`uv run python scripts/production_regression.py --output work/production-regression.json`.
+The script prompts securely when `OIDA_SESSION_TOKEN` is absent and never writes
+the credential to its report. For the full ecosystem backup exercise, run
+`uv run python scripts/backup_restore_drill.py`; it uses SQLite online backup,
+restores into an isolated protected directory, and compares integrity and row counts.
+
 ## Host service
 
 The installed home-server service uses a user-level systemd unit, loopback listener, restart-on-failure, explicit memory/CPU/task limits, read-only system paths and only its own writable data path. It does not modify Docker, protected workloads, firewall or partitions. Stop only this service with `systemctl --user stop oida-next.service`.
@@ -20,7 +27,11 @@ After restart, log in to unlock the managed local agent. A forgotten password ca
 
 ## Backup / restore
 
-Use SQLite's online backup API for the control DB and agent journal; do not copy live main database files without WAL. Encrypted identity files can be copied as ciphertext. No plaintext private key or passphrase belongs in a backup. Before restore, stop only OIDA Next, preserve the current DB and its WAL/SHM plus encrypted identities, verify integrity of a restored copy in an isolated directory, and restart. No automatic production restore is performed by the demo.
+Use `scripts/backup_restore_drill.py` for online SQLite backups of all ecosystem
+databases. It does not replace production data: restoration is deliberately
+isolated and verified before any operator-approved recovery. Encrypted identity
+files can be copied as ciphertext. No plaintext private key, password, API key,
+or passphrase belongs in a backup.
 
 ## Troubleshooting
 

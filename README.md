@@ -41,4 +41,4 @@ Enter the encrypted identity passphrase and pairing token at hidden prompts. Sub
 
 This is **not** an unrestricted remote shell or an autonomous coding product. It supports three fixed recipes; arbitrary commands, package installation on the host, production changes, paid providers, general DAGs, Windows/Mac/mobile agents and ChatGPT integration are not implemented. Unknown goals are rejected. Do not grant root, mount Docker sockets, or extend recipes to accept arbitrary shell strings.
 
-See `docs/architecture.md`, `docs/security.md`, `docs/operations.md`, and `docs/legacy-inventory.md` for contracts, deployment and limitations.
+See `docs/architecture.md`, `docs/security.md`, `docs/operations.md`, `docs/operator-guide-th.md`, and `docs/legacy-inventory.md` for contracts, deployment, daily use and limitations.

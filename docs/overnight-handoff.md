@@ -1,5 +1,29 @@
 # Overnight continuation — 2026-09-05
 
+## COMPLETE — production operations hardening, 2026-09-07 14:25 Bangkok
+
+The selected follow-up scope `1,2,3,6` is complete. A read-only authenticated
+production regression script now checks AI settings and provider health, locates
+the approved DeepSeek acceptance project, reruns full-loop verification, and
+reports online agents without exposing credentials or creating duplicate work.
+
+The ecosystem backup/restore drill passed all 21 SQLite databases with integrity
+`ok` and exact source/restored row counts. Its evidence is stored in
+`docs/backup-restore-drill-result.json`; restored copies remain isolated under a
+protected run directory. Production database and backup permissions were
+hardened to owner-only access and all services stayed healthy.
+
+The security review found no high-severity issue and no known vulnerable Python
+dependency. Browser security headers were added to every Pages response. One
+Bandit medium finding remains accepted for the local Unix ingress socket mode,
+which is required by the ingress boundary and protected by directory ownership
+and the system service sandbox. See `docs/security-review-2026-09-07.md`.
+
+The Thai operator guide in `docs/operator-guide-th.md` covers the complete
+requirement-to-PM/QA/Document/Infra flow, DeepSeek configuration, revisions,
+retry behavior, full-loop verification, agent recovery, regression, backup, and
+credential handling.
+
 ## COMPLETE — operational cleanup accepted, 2026-09-07 14:10 Bangkok
 
 The unused QA project `data-platform-project-ai-complete-2`, created by the

@@ -156,7 +156,9 @@ class Agent:
             stderr=subprocess.STDOUT,
             start_new_session=True,
         )
-        assert process.stdout is not None
+        if process.stdout is None:
+            process.kill()
+            raise RuntimeError("Recipe output pipe was not created")
         selector = selectors.DefaultSelector()
         selector.register(process.stdout, selectors.EVENT_READ)
         started, last_check = time.monotonic(), 0.0

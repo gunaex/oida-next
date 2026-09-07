@@ -102,8 +102,18 @@ export async function moduleRequest(request, module, apiPath, send = fetch) {
   return new Response(upstream.body, {status: upstream.status, headers: output});
 }
 
-export default {
-  async fetch(request, env) {
+function secureResponse(response) {
+  const headers = new Headers(response.headers);
+  headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("X-Frame-Options", "DENY");
+  headers.set("Referrer-Policy", "no-referrer");
+  headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
+  return new Response(response.body, {status: response.status, statusText: response.statusText, headers});
+}
+
+async function handleRequest(request, env) {
     const url = new URL(request.url);
     const moduleRoute = url.pathname.match(/^\/modules\/(pm|qa|document|infra)(\/api\/.*)$/);
     if (moduleRoute) {
@@ -126,5 +136,10 @@ export default {
         body:["GET","HEAD"].includes(request.method)?undefined:request.body, redirect:"manual"}));
     }
     return env.ASSETS.fetch(request);
+}
+
+export default {
+  async fetch(request, env) {
+    return secureResponse(await handleRequest(request, env));
   }
 };
