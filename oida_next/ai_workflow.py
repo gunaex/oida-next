@@ -800,12 +800,19 @@ async def _qa_project(call, token, draft):
 
 
 async def _qa_suite(call, token, slug, suite):
+    suite_type = suite.get("suite_type", "OTHER")
+    if suite_type not in {"SMOKE", "INTEGRATION", "REGRESSION", "UAT", "OTHER"}:
+        suite_type = "OTHER"
     r = await call(
         "qa",
         "POST",
         f"{slug}/suites",
         token,
-        body={k: suite[k] for k in ("name", "description", "suite_type")},
+        body={
+            "name": suite["name"],
+            "description": suite["description"],
+            "suite_type": suite_type,
+        },
     )
     return {"suite_id": r.get("id")}
 

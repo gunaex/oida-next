@@ -1,6 +1,30 @@
 # Overnight continuation — 2026-09-05
 
-## ACTIVE — closed loop deployed; two external acceptance gates, 2026-09-07
+## ACTIVE — revision accepted; final QA retry needs OIDA sign-in, 2026-09-07 13:10 Bangkok
+
+GitHub CLI was authenticated through the user's existing signed-in browser.
+OIDA `main` was pushed to `https://github.com/gunaex/oida-next.git` and Infra
+`main` was pushed through `38ff645` to
+`https://github.com/gunaex/INFRA-AGAIN.git`.
+
+Production revision `6162caed-cde0-48b5-9ada-2e782dcbe480` was retried after
+the local-model timeout fix and reached DRAFT in about 150 seconds. Its diff was
+reviewed and all four modules were selected and exact-hash approved. PM,
+Document, and Infra revision distribution completed. QA rejected only the new
+Recovery Test Suite because the model returned `suite_type=RECOVERY`, outside
+the QA contract. Existing approved work remained intact.
+
+The runtime now normalizes unsupported QA suite types to `OTHER` both when an AI
+plan is validated and again at the QA delivery boundary. Negative authorization
+cases are also normalized to `negative_path=true`. The fix passes 58 pytest,
+Ruff, and Mypy checks and is deployed; OIDA is READY. Loading the fix required a
+service restart, which expired the production browser session as designed.
+After the user signs in to OIDA once more, click `Retry unfinished items` on the
+revision. It will retry the failed QA item only. Verify the revision becomes
+APPROVED and then run the full-loop check. Commit and push this fix and the
+completed checkpoint after acceptance.
+
+## CHECKPOINT — closed loop deployed; two external acceptance gates, 2026-09-07
 
 User authorized the full phase and explicitly required every change to be
 committed and pushed. Production now includes durable full-loop verification,

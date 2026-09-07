@@ -130,6 +130,14 @@ def validate_plan(value: dict) -> dict:
             or not suite["test_cases"]
         ):
             raise ValueError("AI plan contains an invalid QA suite")
+        if suite.get("suite_type") not in {
+            "SMOKE",
+            "INTEGRATION",
+            "REGRESSION",
+            "UAT",
+            "OTHER",
+        }:
+            suite["suite_type"] = "OTHER"
         for case in suite["test_cases"]:
             if not isinstance(case, dict) or not all(
                 isinstance(case.get(key), str) and case[key].strip()
@@ -138,6 +146,10 @@ def validate_plan(value: dict) -> dict:
                 raise ValueError("AI plan contains an invalid QA case")
             case.setdefault("category", "FUNCTIONAL")
             case.setdefault("negative_path", False)
+            if "negative" in case["title"].lower() or "unauthorized" in case[
+                "description"
+            ].lower():
+                case["negative_path"] = True
     for requirement in value["document_requirements"]:
         if not isinstance(requirement, dict) or not isinstance(requirement.get("title"), str):
             raise TypeError("AI plan contains an invalid document requirement")

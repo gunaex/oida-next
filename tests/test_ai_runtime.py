@@ -63,10 +63,20 @@ def test_structured_plan_accepts_fenced_json_and_rejects_missing_sections():
     normalized = sample_plan()
     normalized["infra"]["components"] = ["Kafka, Spark, Object Storage"]
     normalized["pm_tasks"][0]["priority"] = "Medium"
+    normalized["qa_suites"][0]["suite_type"] = "RECOVERY"
+    normalized["qa_suites"][0]["test_cases"][0].update(
+        {
+            "title": "Reject negative authorization",
+            "description": "An unauthorized user requests protected data",
+            "negative_path": False,
+        }
+    )
     result = validate_plan(normalized)
     assert result["infra"]["components"] == ["Kafka", "Spark", "Object Storage"]
     assert result["pm_tasks"][0]["priority"] == "Med"
     assert result["qa_suites"][0]["test_cases"][0]["category"] == "FUNCTIONAL"
+    assert result["qa_suites"][0]["suite_type"] == "OTHER"
+    assert result["qa_suites"][0]["test_cases"][0]["negative_path"] is True
     assert result["document_requirements"][0]["acceptance_criteria"]
 
 
