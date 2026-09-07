@@ -15,6 +15,9 @@ async function api(path, method = "GET", body) {
   } else {
     throw new Error(response.ok ? "The OIDA service returned an unexpected response." : "The OIDA service is temporarily unavailable. Please retry.");
   }
+  if (response.status === 401 && token) {
+    token = ""; $("workspace").hidden = true; $("login").hidden = false; $("logout").hidden = true;
+  }
   if (!response.ok) throw new Error(typeof value.detail === "string" ? value.detail : "Request rejected; check the supplied fields.");
   return value;
 }

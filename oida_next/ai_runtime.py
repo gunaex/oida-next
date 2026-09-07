@@ -166,7 +166,7 @@ async def generate_plan(
     config = _config(store)
     system, user = _prompt(title, requirement)
     try:
-        async with httpx.AsyncClient(transport=transport, timeout=180, trust_env=False) as client:
+        async with httpx.AsyncClient(transport=transport, timeout=360, trust_env=False) as client:
             if config.provider == "local":
                 response = await client.post(
                     LOCAL_BASE + "/api/generate",
