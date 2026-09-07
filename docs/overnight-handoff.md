@@ -1,5 +1,29 @@
 # Overnight continuation — 2026-09-05
 
+## ACTIVE — governed AI workflow ready for production deployment, 2026-09-07
+
+OIDA now has a real server-side AI workflow using configurable local Ollama or
+DeepSeek. Local generation was proven with `mistral:latest`; the earlier Typhoon
+default exceeded available memory at its 65k context, so Mistral is the safe
+default and requests are bounded to a 4096-token context. DeepSeek credentials
+remain server-side and are never returned by either settings endpoint.
+
+The new durable flow is requirement -> AI draft -> human edit/review -> exact
+plan-hash approval -> idempotent distribution. Approved plans create every AI
+PM task, QA suite/revision/test case, Document requirement, and Infra
+workspace/design/component flow. Per-item checkpoints retain successes and retry
+only failures. The root UI exposes provider configuration and makes review or
+editing mandatory before approval. Validation: 57 pytest, Ruff, Mypy, JavaScript
+syntax, and 9 Pages gateway tests pass.
+
+Still required before completion: commit, deploy the backend and Pages bundle,
+run a real production Local LLM draft, review/approve it, verify all generated
+records inside the four production modules, restart OIDA to prove durability,
+and update the two user samples if production contracts require adjustments.
+The only automation `continue-oida-ecosystem-integration` targets this task and
+is ACTIVE daily at 13:00 Asia/Bangkok; never create a duplicate or consume a
+usage-reset credit.
+
 ## ACTIVE — restore original AI orchestration, approved 2026-09-07
 
 The user explicitly approved continuous implementation until the AI-ready system

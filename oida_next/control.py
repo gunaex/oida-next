@@ -418,6 +418,9 @@ def create_app(
     from .ai_runtime import install_ai
 
     install_ai(app, store, operator)
+    from .ai_workflow import install_ai_workflow
+
+    install_ai_workflow(app, store, operator)
 
     @app.get("/api/v1/models")
     def models(actor=Depends(operator)):

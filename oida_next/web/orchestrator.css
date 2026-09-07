@@ -12,7 +12,15 @@
 .target-card small { color:#ffaaaa }
 .requirement-preview { white-space:pre-wrap; color:#b9c6d8; max-height:7rem; overflow:hidden }
 .orchestration-card>.secondary { margin-top:1rem }
+.draft-plan { min-height:280px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:.82rem; line-height:1.45 }
+.draft-summary { display:flex; gap:.6rem; flex-wrap:wrap; color:#9bacc2; font-size:.85rem; margin:.8rem 0 }
+.draft-error { color:#ffaaaa }
+#ai-settings { margin:-.75rem 0 2rem; border:1px solid #283243; border-radius:7px; padding:1rem }
+#ai-settings>summary { cursor:pointer; color:#b9c6d8 }
+.settings-form { display:grid; grid-template-columns:1fr 1fr 1.5fr auto; gap:1rem; align-items:end; margin-top:1rem }
+.settings-form input,.settings-form select { margin-bottom:0 }
+.settings-form .muted { grid-column:1/-1 }
 details#advanced { margin-top:2.5rem; border-top:1px solid #283243; padding-top:1rem }
 details#advanced>summary { cursor:pointer; color:#99a8be }
 .advanced-body { padding-top:1.5rem }
-@media(max-width:720px) { .module-grid,.target-grid { grid-template-columns:1fr } }
+@media(max-width:720px) { .module-grid,.target-grid,.settings-form { grid-template-columns:1fr } }

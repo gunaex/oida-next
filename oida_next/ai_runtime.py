@@ -40,7 +40,7 @@ def _setting(store, key: str) -> str | None:
 
 def _config(store) -> ProviderConfig:
     provider = _setting(store, "ai_provider") or "local"
-    model = _setting(store, "ai_model") or "typhoon2-64k:latest"
+    model = _setting(store, "ai_model") or "mistral:latest"
     key = _setting(store, "ai_deepseek_key")
     if provider not in {"local", "deepseek"}:
         raise HTTPException(503, "AI provider configuration is invalid")
@@ -67,7 +67,7 @@ Return this JSON object:
   "assumptions": ["explicit assumption"],
   "risks": ["material risk"],
   "pm_tasks": [{{"title":"...","description":"...","phase":"Planning|UR|DR|DN|ST|UT|IP","priority":"High|Med|Low"}}],
-  "qa_suites": [{{"name":"...","description":"...","suite_type":"SMOKE|INTEGRATION|REGRESSION|UAT|OTHER","test_cases":[{{"title":"...","description":"...","priority":"HIGH|MEDIUM|LOW"}}]}}],
+  "qa_suites": [{{"name":"...","description":"...","suite_type":"SMOKE|INTEGRATION|REGRESSION|UAT|OTHER","test_cases":[{{"title":"...","description":"...","expected_result":"...","priority":"HIGH|MEDIUM|LOW"}}]}}],
   "document_requirements": [{{"title":"...","description":"...","priority":"MUST|SHOULD|COULD"}}],
   "infra": {{"provider":"AWS|GCP|ON_PREM","platform":"KUBERNETES|NATIVE_VM|OPENSHIFT_OCP","components":["..."],"rationale":"..."}}
 }}
@@ -127,6 +127,12 @@ def validate_plan(value: dict) -> dict:
             or not suite["test_cases"]
         ):
             raise ValueError("AI plan contains an invalid QA suite")
+        for case in suite["test_cases"]:
+            if not isinstance(case, dict) or not all(
+                isinstance(case.get(key), str) and case[key].strip()
+                for key in ("title", "description", "expected_result", "priority")
+            ):
+                raise ValueError("AI plan contains an invalid QA case")
     for requirement in value["document_requirements"]:
         if not isinstance(requirement, dict) or not isinstance(requirement.get("title"), str):
             raise TypeError("AI plan contains an invalid document requirement")

@@ -259,6 +259,9 @@ def install_identity(
         except (httpx.HTTPError, ValueError, TypeError):
             raise HTTPException(502, f"{module.title()} service unavailable") from None
 
+    app.state.identity_connection = connected
+    app.state.module_json = module_json
+
     def orchestration_view(db, orchestration_id: str):
         row = db.execute("SELECT * FROM orchestrations WHERE id=?", (orchestration_id,)).fetchone()
         if not row:

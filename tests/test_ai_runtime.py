@@ -22,7 +22,14 @@ def sample_plan():
                 "name": "Acceptance",
                 "description": "Validate",
                 "suite_type": "UAT",
-                "test_cases": [{"title": "Happy path", "description": "Works", "priority": "HIGH"}],
+                "test_cases": [
+                    {
+                        "title": "Happy path",
+                        "description": "Works",
+                        "expected_result": "The workflow completes",
+                        "priority": "HIGH",
+                    }
+                ],
             }
         ],
         "document_requirements": [
