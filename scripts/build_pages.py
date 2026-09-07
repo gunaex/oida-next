@@ -49,6 +49,10 @@ def build(
                     file.read_bytes()
                 ).hexdigest()
     if shell:
+        shell_markup = (
+            '<link rel="stylesheet" href="/shell.css?v=20260907k">'
+            '<script src="/shell.js?v=20260907k" data-modules="{enabled}" defer></script>'
+        )
         for name in ("shell.js", "shell.css"):
             source = root / "oida_next" / "web" / name
             shutil.copyfile(source, destination / name)
@@ -61,9 +65,15 @@ def build(
             if "</head>" not in html:
                 raise ValueError("Module HTML is missing a head element")
             enabled = ",".join(routes[name] for name in modules)
+            while '<link rel="stylesheet" href="/shell.css"><script src="/shell.js"' in html:
+                start = html.index(
+                    '<link rel="stylesheet" href="/shell.css"><script src="/shell.js"'
+                )
+                end = html.index("</script>", start) + len("</script>")
+                html = html[:start] + html[end:]
             html = html.replace(
                 "</head>",
-                f'<link rel="stylesheet" href="/shell.css"><script src="/shell.js" data-modules="{enabled}" defer></script></head>',
+                shell_markup.format(enabled=enabled) + "</head>",
                 1,
             )
             page.write_text(html)

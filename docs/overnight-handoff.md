@@ -1,5 +1,18 @@
 # Overnight continuation — 2026-09-05
 
+## COMPLETE — contextual guides in every system, 2026-09-07 14:35 Bangkok
+
+The shared authenticated shell now provides a Thai `คู่มือ` dialog in OIDA,
+PM, QA, Document, and Infra. Each route has its own purpose, five-step workflow,
+and an operational caution tailored to that module. The guide is keyboard and
+mobile friendly, uses safe DOM text construction, and does not change SSO.
+
+The Pages builder now removes previously injected shell tags before adding one
+cache-versioned copy, preventing duplicate navigation when an existing module
+bundle is rebuilt. Production release `598dd7f3` serves exactly one shell on all
+five routes. Browser acceptance opened every guide and matched all five titles;
+the final tab returned to OIDA Next Orchestrator.
+
 ## COMPLETE — production operations hardening, 2026-09-07 14:25 Bangkok
 
 The selected follow-up scope `1,2,3,6` is complete. A read-only authenticated

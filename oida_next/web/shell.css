@@ -3,4 +3,16 @@
 .oida-shell a:first-child { color:#fff; font-weight:750; margin-right:auto; }
 .oida-shell a:hover,.oida-shell a[aria-current] { color:#fff; background:#29405d; }
 .oida-shell a:focus-visible { outline:3px solid #67e8f9; outline-offset:2px; }
+.oida-guide-button { border:1px solid #6d86a5; color:#fff; background:#29405d; padding:.4rem .75rem; border-radius:.35rem; font:inherit; cursor:pointer; }
+.oida-guide-button:hover { background:#385578; }
+.oida-guide-button:focus-visible,.oida-guide-close:focus-visible { outline:3px solid #67e8f9; outline-offset:2px; }
+.oida-guide { width:min(42rem,calc(100% - 2rem)); max-height:calc(100% - 2rem); border:0; border-radius:.8rem; padding:0; color:#172033; box-shadow:0 1.5rem 4rem #0008; font:400 1rem/1.65 system-ui,sans-serif; }
+.oida-guide::backdrop { background:#07101dcc; backdrop-filter:blur(2px); }
+.oida-guide article { padding:1.5rem; }
+.oida-guide h2 { margin:0 0 .35rem; font-size:1.55rem; }
+.oida-guide-intro { margin:.25rem 0 1rem; color:#475569; }
+.oida-guide ol { margin:0; padding-left:1.5rem; }
+.oida-guide li { padding:.25rem 0 .25rem .2rem; }
+.oida-guide-note { margin:1rem 0; padding:.75rem 1rem; border-left:4px solid #2563eb; background:#eff6ff; }
+.oida-guide-close { border:0; border-radius:.4rem; padding:.55rem 1rem; color:#fff; background:#1d4ed8; font:600 1rem/1.4 system-ui,sans-serif; cursor:pointer; }
 @media(max-width:480px) { .oida-shell { gap:.15rem; padding:.5rem; } .oida-shell a { padding:.4rem .5rem; } .oida-shell a:first-child { flex-basis:100%; } }
