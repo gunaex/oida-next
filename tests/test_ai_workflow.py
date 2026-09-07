@@ -49,7 +49,28 @@ def plan():
 
 def test_draft_requires_reviewed_hash_and_distributes_every_generated_item(tmp_path, monkeypatch):
     async def generated(store, title, requirement, transport=None):
-        return plan(), "local", "mistral:latest"
+        value = plan()
+        if "REQUESTED CHANGE" in requirement:
+            value["pm_tasks"][0]["description"] = "Review the expanded outcome"
+            value["pm_tasks"].append(
+                {
+                    "title": "Prepare rollout",
+                    "description": "Plan the release",
+                    "phase": "IP",
+                    "priority": "High",
+                }
+            )
+            value["qa_suites"][0]["test_cases"].append(
+                {
+                    "title": "Reject invalid input",
+                    "description": "Submit invalid data",
+                    "expected_result": "The request is rejected",
+                    "priority": "HIGH",
+                }
+            )
+            value["document_requirements"][0]["description"] = "Record every revised approval"
+            value["infra"]["components"].append("Queue")
+        return value, "local", "mistral:latest"
 
     monkeypatch.setattr("oida_next.ai_workflow.generate_plan", generated)
     app = create_app(tmp_path / "workflow.db")
@@ -73,6 +94,10 @@ def test_draft_requires_reviewed_hash_and_distributes_every_generated_item(tmp_p
             return {"workspace": {"currentDesignId": "design"}}
         if method == "GET" and path.startswith("v1/designs/"):
             return {"design": {"designId": "design", "status": "DRAFT"}}
+        if module == "document" and method == "POST" and path.endswith("/draft"):
+            return {"change_id": "change", "draft": {"id": "document-revision"}}
+        if module == "document" and method == "PUT":
+            return {"id": "document-revision"}
         if module == "pm" and path == "projects":
             return {"id": "pm-project", "slug": "delivery"}
         if module == "pm":
@@ -158,3 +183,27 @@ def test_draft_requires_reviewed_hash_and_distributes_every_generated_item(tmp_p
         },
     )
     assert repeated.json()["id"] == draft["id"]
+
+    revision_created = client.post(
+        f"/api/v1/ai/drafts/{draft['id']}/revisions",
+        json={
+            "change_request": "Add rollout, negative testing, and queue resilience",
+            "idempotency_key": "workflow-revision-key-0001",
+        },
+    )
+    assert revision_created.json()["status"] == "GENERATING"
+    revision = client.get("/api/v1/ai/drafts").json()[0]
+    assert revision["parent_id"] == draft["id"]
+    assert revision["diff"]["pm"]["added"] == ["Prepare rollout"]
+    assert revision["diff"]["infra"]["changed"] is True
+
+    revised = client.post(
+        f"/api/v1/ai/drafts/{revision['id']}/approve-revision",
+        json={
+            "plan_hash": revision["plan_hash"],
+            "modules": ["pm", "qa", "document", "infra"],
+        },
+    )
+    assert revised.status_code == 200
+    assert revised.json()["status"] == "APPROVED"
+    assert revised.json()["selected_modules"] == ["document", "infra", "pm", "qa"]

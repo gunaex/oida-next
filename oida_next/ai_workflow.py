@@ -27,10 +27,44 @@ class DraftApproval(StrictModel):
     plan_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
 
 
+class RevisionCreate(StrictModel):
+    change_request: str = Field(min_length=1, max_length=8000)
+    idempotency_key: str = Field(min_length=16, max_length=100)
+
+
+class RevisionApproval(DraftApproval):
+    modules: list[str] = Field(min_length=1, max_length=4)
+
+
 def _digest(value: dict) -> str:
     return hashlib.sha256(
         json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
+
+
+def _section_diff(before: list[dict], after: list[dict], key: str) -> dict:
+    old = {item[key]: item for item in before}
+    new = {item[key]: item for item in after}
+    return {
+        "added": sorted(new.keys() - old.keys()),
+        "changed": sorted(name for name in new.keys() & old.keys() if new[name] != old[name]),
+        "removed": sorted(old.keys() - new.keys()),
+    }
+
+
+def _plan_diff(before: dict, after: dict) -> dict:
+    return {
+        "pm": _section_diff(before["pm_tasks"], after["pm_tasks"], "title"),
+        "qa": _section_diff(before["qa_suites"], after["qa_suites"], "name"),
+        "document": _section_diff(
+            before["document_requirements"], after["document_requirements"], "title"
+        ),
+        "infra": {
+            "changed": before["infra"] != after["infra"],
+            "added": [],
+            "removed": [],
+        },
+    }
 
 
 def install_ai_workflow(app, store, operator):
@@ -54,6 +88,10 @@ def install_ai_workflow(app, store, operator):
         columns = {row[1] for row in db.execute("PRAGMA table_info(ai_drafts)")}
         if "error" not in columns:
             db.execute("ALTER TABLE ai_drafts ADD COLUMN error TEXT")
+        if "parent_id" not in columns:
+            db.execute("ALTER TABLE ai_drafts ADD COLUMN parent_id TEXT")
+        if "revision_no" not in columns:
+            db.execute("ALTER TABLE ai_drafts ADD COLUMN revision_no INTEGER NOT NULL DEFAULT 1")
 
     def view(db, draft_id):
         row = db.execute("SELECT * FROM ai_drafts WHERE id=?", (draft_id,)).fetchone()
@@ -67,6 +105,11 @@ def install_ai_workflow(app, store, operator):
             "SELECT checked,result FROM ai_verifications WHERE draft_id=? ORDER BY id DESC LIMIT 1",
             (draft_id,),
         ).fetchone()
+        parent = (
+            db.execute("SELECT plan FROM ai_drafts WHERE id=?", (row["parent_id"],)).fetchone()
+            if row["parent_id"]
+            else None
+        )
         return {
             "id": row["id"],
             "title": row["title"],
@@ -79,6 +122,11 @@ def install_ai_workflow(app, store, operator):
             "error": row["error"],
             "created": row["created"],
             "updated": row["updated"],
+            "parent_id": row["parent_id"],
+            "revision_no": row["revision_no"],
+            "diff": _plan_diff(json.loads(parent["plan"]), json.loads(row["plan"]))
+            if parent and row["status"] not in {"GENERATING", "FAILED"}
+            else None,
             "verification": (
                 {"checked": last_check["checked"], **json.loads(last_check["result"])}
                 if last_check
@@ -136,8 +184,8 @@ def install_ai_workflow(app, store, operator):
         with store.tx() as db:
             db.execute(
                 "INSERT INTO ai_drafts(id,title,requirement,provider,model,plan,plan_hash,"
-                "status,idempotency,request_hash,error,created,updated) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "status,idempotency,request_hash,error,created,updated,parent_id,revision_no) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     draft_id,
                     title,
@@ -152,10 +200,63 @@ def install_ai_workflow(app, store, operator):
                     None,
                     now,
                     now,
+                    None,
+                    1,
                 ),
             )
             result = view(db, draft_id)
         tasks.add_task(generate_draft, draft_id, title, requirement)
+        return result
+
+    @app.post("/api/v1/ai/drafts/{draft_id}/revisions", dependencies=[Depends(operator)])
+    async def create_revision(draft_id: str, body: RevisionCreate, tasks: BackgroundTasks):
+        with store.tx() as db:
+            parent = view(db, draft_id)
+            if parent["status"] != "APPROVED":
+                raise HTTPException(409, "Only approved work can be revised")
+            old = db.execute(
+                "SELECT id FROM ai_drafts WHERE idempotency=?", (body.idempotency_key,)
+            ).fetchone()
+            if old:
+                return view(db, old["id"])
+            revision_no = db.execute(
+                "SELECT COALESCE(MAX(revision_no),1)+1 FROM ai_drafts WHERE id=? OR parent_id=?",
+                (draft_id, draft_id),
+            ).fetchone()[0]
+            child_id, now = str(uuid.uuid4()), time.time()
+            request_hash = _digest(
+                {"parent_id": draft_id, "change_request": body.change_request.strip()}
+            )
+            db.execute(
+                "INSERT INTO ai_drafts(id,title,requirement,provider,model,plan,plan_hash,"
+                "status,idempotency,request_hash,error,created,updated,parent_id,revision_no) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    child_id,
+                    parent["title"],
+                    body.change_request.strip(),
+                    "pending",
+                    "pending",
+                    "{}",
+                    "0" * 64,
+                    "GENERATING",
+                    body.idempotency_key,
+                    request_hash,
+                    None,
+                    now,
+                    now,
+                    draft_id,
+                    revision_no,
+                ),
+            )
+            result = view(db, child_id)
+        prompt = (
+            "Revise the current approved delivery plan using the requested change. "
+            "Return the complete revised plan, retaining unaffected work.\n\n"
+            f"CURRENT PLAN:\n{json.dumps(parent['plan'])}\n\n"
+            f"REQUESTED CHANGE:\n{body.change_request.strip()}"
+        )
+        tasks.add_task(generate_draft, child_id, parent["title"], prompt)
         return result
 
     @app.put("/api/v1/ai/drafts/{draft_id}", dependencies=[Depends(operator)])
@@ -305,6 +406,85 @@ def install_ai_workflow(app, store, operator):
         result["failures"] = failures
         return result
 
+    @app.post("/api/v1/ai/drafts/{draft_id}/approve-revision", dependencies=[Depends(operator)])
+    async def approve_revision(draft_id: str, body: RevisionApproval, request: Request):
+        modules = set(body.modules)
+        if not modules.issubset({"pm", "qa", "document", "infra"}):
+            raise HTTPException(422, "Revision contains an unsupported module")
+        connection = await app.state.identity_connection(request)
+        if not connection:
+            raise HTTPException(401, "OIDA identity is unavailable")
+        with store.tx() as db:
+            draft = view(db, draft_id)
+            if not draft["parent_id"] or draft["status"] not in {"DRAFT", "PARTIAL"}:
+                raise HTTPException(409, "Revision is not awaiting approval")
+            if draft["plan_hash"] != body.plan_hash:
+                raise HTTPException(409, "Revision changed; review it again before approval")
+            parent = view(db, draft["parent_id"])
+            db.execute(
+                "UPDATE ai_drafts SET status='DISTRIBUTING',updated=? WHERE id=?",
+                (time.time(), draft_id),
+            )
+
+        async def ensure(module, key, factory):
+            with store.tx() as db:
+                existing = db.execute(
+                    "SELECT status,result FROM ai_draft_items "
+                    "WHERE draft_id=? AND module=? AND item_key=?",
+                    (draft_id, module, key),
+                ).fetchone()
+            if existing and existing["status"] == "CREATED":
+                return json.loads(existing["result"])
+            try:
+                result = await factory()
+                if not isinstance(result, dict) or not any(result.values()):
+                    raise ValueError("Module returned no record identifier")
+                status, error = "CREATED", None
+            except (HTTPException, ValueError, KeyError, TypeError) as exc:
+                result, status = None, "FAILED"
+                error = exc.detail if isinstance(exc, HTTPException) else str(exc)
+            with store.tx() as db:
+                db.execute(
+                    "INSERT OR REPLACE INTO ai_draft_items VALUES(?,?,?,?,?,?,?)",
+                    (
+                        draft_id,
+                        module,
+                        key,
+                        status,
+                        json.dumps(result) if result else None,
+                        error,
+                        time.time(),
+                    ),
+                )
+            if status == "FAILED":
+                raise HTTPException(502, error)
+            return result
+
+        call, token, failures = app.state.module_json, connection["token"], []
+        handlers = {
+            "pm": _revise_pm,
+            "qa": _revise_qa,
+            "document": _revise_document,
+            "infra": _revise_infra,
+        }
+        for module in ("pm", "qa", "document", "infra"):
+            if module not in modules:
+                continue
+            try:
+                await handlers[module](call, token, parent, draft, ensure)
+            except HTTPException as exc:
+                failures.append(f"{module.title()}: {exc.detail}")
+        with store.tx() as db:
+            status = "PARTIAL" if failures else "APPROVED"
+            db.execute(
+                "UPDATE ai_drafts SET status=?,updated=? WHERE id=?",
+                (status, time.time(), draft_id),
+            )
+            result = view(db, draft_id)
+        result["failures"] = failures
+        result["selected_modules"] = sorted(modules)
+        return result
+
     @app.post("/api/v1/ai/drafts/{draft_id}/verify", dependencies=[Depends(operator)])
     async def verify(draft_id: str, request: Request):
         connection = await app.state.identity_connection(request)
@@ -342,6 +522,128 @@ def _created(draft: dict, module: str, key: str | None = None) -> list[dict]:
         and item["status"] == "CREATED"
         and (key is None or item["key"] == key)
     ]
+
+
+def _indexed_result(draft: dict, module: str, prefix: str, index: int) -> dict:
+    key = f"{prefix}-{index}"
+    return next(item["result"] for item in _created(draft, module) if item["key"] == key)
+
+
+async def _revise_pm(call, token: str, parent: dict, draft: dict, ensure):
+    project = _created(parent, "pm", "project")[0]["result"]
+    old = {item["title"]: (index, item) for index, item in enumerate(parent["plan"]["pm_tasks"])}
+    for index, task in enumerate(draft["plan"]["pm_tasks"]):
+        prior = old.get(task["title"])
+        if prior is None:
+            await ensure(
+                "pm",
+                f"revision-task-add-{index}",
+                lambda task=task: _pm_task(call, token, project["slug"], task),
+            )
+        elif prior[1] != task:
+            task_id = _indexed_result(parent, "pm", "task", prior[0])["task_id"]
+            await ensure(
+                "pm",
+                f"revision-task-update-{task_id}",
+                lambda task=task, task_id=task_id: _pm_task_update(
+                    call, token, project["slug"], task_id, task
+                ),
+            )
+
+
+async def _revise_qa(call, token: str, parent: dict, draft: dict, ensure):
+    project = _created(parent, "qa", "project")[0]["result"]
+    old = {item["name"]: (index, item) for index, item in enumerate(parent["plan"]["qa_suites"])}
+    for index, suite in enumerate(draft["plan"]["qa_suites"]):
+        prior = old.get(suite["name"])
+        if prior is None:
+            created = await ensure(
+                "qa",
+                f"revision-suite-add-{index}",
+                lambda suite=suite: _qa_suite(call, token, project["slug"], suite),
+            )
+            suite_id = created["suite_id"]
+        elif prior[1] != suite:
+            suite_id = _indexed_result(parent, "qa", "suite", prior[0])["suite_id"]
+        else:
+            continue
+        revision = await ensure(
+            "qa",
+            f"revision-script-{index}",
+            lambda suite_id=suite_id: _qa_revision_numbered(
+                call, token, project["slug"], suite_id, draft
+            ),
+        )
+        for case_index, case in enumerate(suite["test_cases"]):
+            await ensure(
+                "qa",
+                f"revision-case-{index}-{case_index}",
+                lambda case=case, revision=revision, case_index=case_index: _qa_case(
+                    call,
+                    token,
+                    project["slug"],
+                    revision["revision_id"],
+                    case,
+                    case_index,
+                ),
+            )
+
+
+async def _revise_document(call, token: str, parent: dict, draft: dict, ensure):
+    project = _created(parent, "document", "project")[0]["result"]
+    old = {
+        item["title"]: (index, item)
+        for index, item in enumerate(parent["plan"]["document_requirements"])
+    }
+    for index, requirement in enumerate(draft["plan"]["document_requirements"]):
+        prior = old.get(requirement["title"])
+        if prior is None:
+            await ensure(
+                "document",
+                f"revision-requirement-add-{index}",
+                lambda requirement=requirement: _document_requirement(
+                    call, token, project["project_id"], requirement, draft["id"]
+                ),
+            )
+        elif prior[1] != requirement:
+            requirement_id = _indexed_result(parent, "document", "requirement", prior[0])[
+                "requirement_id"
+            ]
+            created = await ensure(
+                "document",
+                f"revision-requirement-draft-{requirement_id}",
+                lambda requirement_id=requirement_id: _document_draft(call, token, requirement_id),
+            )
+            await ensure(
+                "document",
+                f"revision-requirement-update-{requirement_id}",
+                lambda requirement=requirement, requirement_id=requirement_id, created=created: (
+                    _document_draft_update(
+                        call, token, requirement_id, created["revision_id"], requirement
+                    )
+                ),
+            )
+
+
+async def _revise_infra(call, token: str, parent: dict, draft: dict, ensure):
+    if parent["plan"]["infra"] == draft["plan"]["infra"]:
+        return
+    workspace = _created(parent, "infra", "workspace")[0]["result"]
+    design = await ensure(
+        "infra",
+        "revision-design",
+        lambda: _infra_design(call, token, draft, draft["plan"]["infra"]),
+    )
+    await ensure(
+        "infra",
+        "revision-flow",
+        lambda: _infra_flow(call, token, design["design_id"], draft["plan"]["infra"]),
+    )
+    await ensure(
+        "infra",
+        "revision-link",
+        lambda: _infra_link(call, token, workspace["workspace_id"], design["design_id"]),
+    )
 
 
 async def _safe_check(module: str, checker, call, token: str, draft: dict) -> dict:
@@ -465,6 +767,11 @@ async def _pm_task(call, token, slug, task):
     return {"task_id": r.get("id")}
 
 
+async def _pm_task_update(call, token, slug, task_id, task):
+    r = await call("pm", "PUT", f"{slug}/tasks/{task_id}", token, body=task)
+    return {"task_id": r.get("id"), "updated": True}
+
+
 async def _qa_project(call, token, draft):
     r = await call("qa", "POST", "projects", token, body={"name": draft["title"]})
     return {"project_id": r.get("id"), "slug": r.get("slug")}
@@ -488,6 +795,20 @@ async def _qa_revision(call, token, slug, suite_id, draft_id):
         f"{slug}/suites/{suite_id}/revisions",
         token,
         body={"revision_label": "AI Draft 1", "change_summary": f"OIDA draft {draft_id}"},
+    )
+    return {"revision_id": r.get("id")}
+
+
+async def _qa_revision_numbered(call, token, slug, suite_id, draft):
+    r = await call(
+        "qa",
+        "POST",
+        f"{slug}/suites/{suite_id}/revisions",
+        token,
+        body={
+            "revision_label": f"AI Revision {draft['revision_no']}",
+            "change_summary": f"OIDA revision {draft['id']}",
+        },
     )
     return {"revision_id": r.get("id")}
 
@@ -530,10 +851,7 @@ async def _document_project(call, token, draft, draft_id):
 
 
 async def _document_requirement(call, token, project_id, requirement, draft_id):
-    criteria = requirement.get("acceptance_criteria") or []
-    description = requirement.get("description", "")
-    if criteria:
-        description += "\n\nAcceptance criteria:\n" + "\n".join(f"- {item}" for item in criteria)
+    description = _document_description(requirement)
     r = await call(
         "document",
         "POST",
@@ -549,6 +867,35 @@ async def _document_requirement(call, token, project_id, requirement, draft_id):
         },
     )
     return {"requirement_id": r.get("id"), "code": r.get("code")}
+
+
+def _document_description(requirement):
+    criteria = requirement.get("acceptance_criteria") or []
+    description = requirement.get("description", "")
+    if criteria:
+        description += "\n\nAcceptance criteria:\n" + "\n".join(f"- {item}" for item in criteria)
+    return description
+
+
+async def _document_draft(call, token, requirement_id):
+    r = await call("document", "POST", f"requirements/{requirement_id}/draft", token)
+    return {"revision_id": (r.get("draft") or {}).get("id"), "change_id": r.get("change_id")}
+
+
+async def _document_draft_update(call, token, requirement_id, revision_id, requirement):
+    r = await call(
+        "document",
+        "PUT",
+        f"requirements/{requirement_id}/draft/{revision_id}",
+        token,
+        body={
+            "title": requirement["title"],
+            "description": _document_description(requirement),
+            "priority": requirement.get("priority", "SHOULD"),
+            "source_type": "OIDA_AI_REVISION",
+        },
+    )
+    return {"revision_id": r.get("id") or revision_id, "updated": True}
 
 
 async def _infra_workspace(call, token, draft):

@@ -51,6 +51,37 @@ function renderVerification(verification) {
   return section;
 }
 
+function renderDiff(diff) {
+  const section = node("div", undefined, "revision-diff");
+  section.append(node("strong", "Changes from the approved plan"));
+  for (const name of ["pm", "qa", "document", "infra"]) {
+    const value = diff[name];
+    const changes = value.changed === true ? ["architecture changed"] : [
+      ...(value.added || []).map(item => `+ ${item}`),
+      ...(value.changed || []).map(item => `~ ${item}`),
+      ...(value.removed || []).map(item => `− ${item} (manual removal)`)
+    ];
+    section.append(node("p", `${moduleNames[name]}: ${changes.length ? changes.join(" · ") : "No change"}`));
+  }
+  return section;
+}
+
+function revisionForm(record) {
+  const details = node("details", undefined, "revision-request");
+  details.append(node("summary", "Request an AI revision"));
+  const field = node("textarea"); field.placeholder = "Describe the approved requirement change…";
+  const button = workflowButton("Generate revision draft", async () => {
+    const changeRequest = field.value.trim();
+    if (!changeRequest) throw new Error("Describe the requested change first.");
+    await api(`/ai/drafts/${record.id}/revisions`, "POST", {
+      change_request:changeRequest, idempotency_key:crypto.randomUUID()
+    });
+    message("AI revision is being generated. Existing work remains unchanged until approval.");
+  });
+  details.append(field, button);
+  return details;
+}
+
 function renderDrafts(records) {
   const container = $("orchestrations"); container.replaceChildren();
   for (const record of records) {
@@ -68,33 +99,47 @@ function renderDrafts(records) {
       node("span", `${record.plan.infra.components.length} infra components`)
     );
     card.append(heading, node("p", record.requirement, "requirement-preview"), counts);
+    if (record.diff) card.append(renderDiff(record.diff));
     if (record.status === "DRAFT") {
       const editor = node("textarea", undefined, "draft-plan");
       editor.value = JSON.stringify(record.plan, null, 2);
       const controls = node("div", undefined, "actions");
-      controls.append(
-        workflowButton("Save edited draft", async () => {
+      controls.append(workflowButton("Save edited draft", async () => {
           let plan;
           try { plan = JSON.parse(editor.value); }
           catch { throw new Error("Draft JSON is invalid. Fix it before saving."); }
           await api(`/ai/drafts/${record.id}`, "PUT", {plan});
           message("Draft saved. Review the updated content before approval.");
-        }),
-        workflowButton("Approve and distribute", async () => {
-          const result = await api(`/ai/drafts/${record.id}/approve`, "POST", {plan_hash:record.plan_hash});
-          message(result.status === "APPROVED" ? "Approved work was created in all four workspaces." : "Some workspaces failed. Successful work was kept; retry the unfinished items.");
-        }, "")
-      );
+        }));
+      if (record.parent_id) {
+        const choices = node("div", undefined, "module-choices");
+        for (const name of ["pm", "qa", "document", "infra"]) {
+          const label = node("label"); const checkbox = node("input"); checkbox.type = "checkbox";
+          checkbox.value = name; checkbox.checked = record.diff[name].changed === true ||
+            record.diff[name].added.length > 0 || record.diff[name].changed.length > 0;
+          label.append(checkbox, document.createTextNode(` ${moduleNames[name]}`)); choices.append(label);
+        }
+        controls.append(choices, workflowButton("Approve selected changes", async () => {
+          const modules = [...choices.querySelectorAll("input:checked")].map(input => input.value);
+          if (!modules.length) throw new Error("Select at least one module to update.");
+          const result = await api(`/ai/drafts/${record.id}/approve-revision`, "POST", {plan_hash:record.plan_hash, modules});
+          message(result.status === "APPROVED" ? "Selected revision changes were applied." : "Some selected changes need a retry.");
+        }, ""));
+      } else controls.append(workflowButton("Approve and distribute", async () => {
+        const result = await api(`/ai/drafts/${record.id}/approve`, "POST", {plan_hash:record.plan_hash});
+        message(result.status === "APPROVED" ? "Approved work was created in all four workspaces." : "Some workspaces failed. Successful work was kept; retry the unfinished items.");
+      }, ""));
       card.append(editor, controls);
     } else {
       const targets = node("div", undefined, "target-grid");
       for (const name of ["pm", "qa", "document", "infra"]) targets.append(targetCard(name, record));
       card.append(targets);
       if (record.verification) card.append(renderVerification(record.verification));
-      if (record.status === "APPROVED") card.append(workflowButton("Run full-loop check", async () => {
+      if (record.status === "APPROVED" && !record.parent_id) card.append(workflowButton("Run full-loop check", async () => {
         const result = await api(`/ai/drafts/${record.id}/verify`, "POST");
         message(result.healthy ? "Full-loop check passed across all four workspaces." : "Full-loop check found a missing or unavailable record.");
       }));
+      if (record.status === "APPROVED" && !record.parent_id) card.append(revisionForm(record));
       if (record.status === "PARTIAL") card.append(workflowButton("Retry unfinished items", async () => {
         await api(`/ai/drafts/${record.id}/approve`, "POST", {plan_hash:record.plan_hash});
         message("Retry completed. Existing records were not duplicated.");

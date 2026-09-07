@@ -25,6 +25,14 @@
 .live-module { display:flex; flex-direction:column; gap:.25rem; color:#dce7f5; text-decoration:none; padding:.75rem; border:1px solid #334255; border-radius:6px }
 .live-module:hover { border-color:#57dbc3 }
 .live-module span,.live-module small { color:#99a8be }
+.revision-diff { margin:.8rem 0; padding:.8rem; border:1px solid #574d36; background:#18170f; border-radius:6px }
+.revision-diff p { margin:.35rem 0; color:#c9bfa5; font-size:.82rem }
+.revision-request { margin-top:.8rem }
+.revision-request summary { cursor:pointer; color:#8cf5df }
+.revision-request textarea { margin-top:.8rem }
+.module-choices { display:flex; gap:.8rem; flex-wrap:wrap; align-items:center }
+.module-choices label { display:flex; align-items:center; gap:.2rem }
+.module-choices input { width:auto; margin:0 }
 details#advanced { margin-top:2.5rem; border-top:1px solid #283243; padding-top:1rem }
 details#advanced>summary { cursor:pointer; color:#99a8be }
 .advanced-body { padding-top:1.5rem }
