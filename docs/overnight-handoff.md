@@ -1,5 +1,37 @@
 # Overnight continuation — 2026-09-05
 
+## ACTIVE — closed loop deployed; two external acceptance gates, 2026-09-07
+
+User authorized the full phase and explicitly required every change to be
+committed and pushed. Production now includes durable full-loop verification,
+live progress/deep links, AI output normalization, governed post-approval AI
+revisions with diff, selective module approval, safe manual handling of removals,
+and retry for failed background generation. Production releases:
+`84a12e21`, `b0e89480`, `7d7db819`, and `0da62d76` on the existing Pages project.
+
+Production full-loop checks PASS for both approved samples. Data Platform reads
+back 7/7 PM tasks, 3/3 QA suites, 6/6 QA cases, 6/6 Document requirements, and a
+linked Infra workspace/design. ERP reads back 9/9, 5/5, 6/6, 5/5, and linked
+Infra. The dashboard stores and displays these results after restart.
+
+The first real Data Platform revision correctly stayed isolated in GENERATING
+without changing approved work, but its larger prompt reached the former
+180-second local model timeout. The runtime is now 360 seconds and the same
+failed draft has a safe Retry AI generation action. Production OIDA session then
+expired as designed; the browser is on the OIDA login screen and no password is
+available to the agent. After the user signs in, retry revision draft
+`6162caed-cde0-48b5-9ada-2e782dcbe480`, review its diff, approve selected
+modules, and verify the resulting PM/QA/Document/Infra changes.
+
+All code is committed and worktrees are clean. OIDA commits through `968935e`;
+canonical Infra through `38ff645`. Push remains blocked by host authentication:
+HTTPS reports no username/credential and SSH reports no accepted public key.
+OIDA now has origin `https://github.com/gunaex/oida-next.git`; Infra origin is
+`https://github.com/gunaex/INFRA-AGAIN.git` and is five commits ahead. Do not
+request credentials in chat. After the user authenticates GitHub on this host,
+push both `main` branches and verify remote heads. The existing 13:00 Asia/Bangkok
+automation is ACTIVE on this task and no duplicate exists.
+
 ## ACTIVE — closed-loop dashboard phase, 2026-09-07
 
 User authorized the full next phase and asked that all code be committed and
