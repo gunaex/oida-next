@@ -438,8 +438,24 @@ def install_ai_workflow(app, store, operator):
             raise HTTPException(401, "OIDA identity is unavailable")
         with store.tx() as db:
             draft = view(db, draft_id)
-            if not draft["parent_id"] or draft["status"] not in {"DRAFT", "PARTIAL"}:
+            failed_modules = {
+                row[0]
+                for row in db.execute(
+                    "SELECT DISTINCT module FROM ai_draft_items "
+                    "WHERE draft_id=? AND status='FAILED'",
+                    (draft_id,),
+                )
+            }
+            retrying_completed_revision = (
+                draft["status"] == "APPROVED" and bool(failed_modules)
+            )
+            if not draft["parent_id"] or (
+                draft["status"] not in {"DRAFT", "PARTIAL"}
+                and not retrying_completed_revision
+            ):
                 raise HTTPException(409, "Revision is not awaiting approval")
+            if retrying_completed_revision and not modules.issubset(failed_modules):
+                raise HTTPException(409, "Only failed revision modules can be retried")
             if draft["plan_hash"] != body.plan_hash:
                 raise HTTPException(409, "Revision changed; review it again before approval")
             parent = view(db, draft["parent_id"])
@@ -843,6 +859,11 @@ async def _qa_revision_numbered(call, token, slug, suite_id, draft):
 
 
 async def _qa_case(call, token, slug, revision_id, case, index):
+    negative_path = bool(case.get("negative_path", False))
+    if "negative" in case.get("title", "").lower() or "unauthorized" in case.get(
+        "description", ""
+    ).lower():
+        negative_path = True
     r = await call(
         "qa",
         "POST",
@@ -855,7 +876,7 @@ async def _qa_case(call, token, slug, revision_id, case, index):
             "action_md": case.get("description", "Execute the described scenario."),
             "expected_result_md": case.get("expected_result", "The requirement is satisfied."),
             "category": case.get("category", "FUNCTIONAL"),
-            "negative_path": bool(case.get("negative_path", False)),
+            "negative_path": negative_path,
             "sequence_no": index + 1,
         },
     )

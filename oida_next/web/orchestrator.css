@@ -15,8 +15,9 @@
 .draft-plan { min-height:280px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:.82rem; line-height:1.45 }
 .draft-summary { display:flex; gap:.6rem; flex-wrap:wrap; color:#9bacc2; font-size:.85rem; margin:.8rem 0 }
 .draft-error { color:#ffaaaa }
-#ai-settings { margin:-.75rem 0 2rem; border:1px solid #283243; border-radius:7px; padding:1rem }
-#ai-settings>summary { cursor:pointer; color:#b9c6d8 }
+#ai-settings { margin:-.75rem 0 2rem; border:1px solid #3f79c6; border-radius:7px; padding:1rem; background:#101a29 }
+#ai-settings>summary { cursor:pointer; color:#e5efff; font-weight:700 }
+.settings-help { margin:.75rem 0 0; color:#aebdd2 }
 .settings-form { display:grid; grid-template-columns:1fr 1fr 1.5fr auto; gap:1rem; align-items:end; margin-top:1rem }
 .settings-form input,.settings-form select { margin-bottom:0 }
 .settings-form .muted { grid-column:1/-1 }

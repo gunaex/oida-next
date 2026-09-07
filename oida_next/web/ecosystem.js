@@ -136,6 +136,7 @@ function renderDrafts(records) {
         message("AI generation restarted. Existing approved work remains unchanged.");
       }));
     } else if (record.status !== "GENERATING") {
+      const failedModules = [...new Set(record.items.filter(item => item.status === "FAILED").map(item => item.module))];
       const targets = node("div", undefined, "target-grid");
       for (const name of ["pm", "qa", "document", "infra"]) targets.append(targetCard(name, record));
       card.append(targets);
@@ -145,8 +146,10 @@ function renderDrafts(records) {
         message(result.healthy ? "Full-loop check passed across all four workspaces." : "Full-loop check found a missing or unavailable record.");
       }));
       if (record.status === "APPROVED" && !record.parent_id) card.append(revisionForm(record));
-      if (record.status === "PARTIAL") card.append(workflowButton("Retry unfinished items", async () => {
-        await api(`/ai/drafts/${record.id}/approve`, "POST", {plan_hash:record.plan_hash});
+      if (record.status === "PARTIAL" || (record.parent_id && failedModules.length)) card.append(workflowButton("Retry unfinished items", async () => {
+        const path = record.parent_id ? "approve-revision" : "approve";
+        const body = record.parent_id ? {plan_hash:record.plan_hash, modules:failedModules} : {plan_hash:record.plan_hash};
+        await api(`/ai/drafts/${record.id}/${path}`, "POST", body);
         message("Retry completed. Existing records were not duplicated.");
       }));
     }

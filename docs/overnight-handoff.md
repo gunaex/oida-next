@@ -1,6 +1,30 @@
 # Overnight continuation — 2026-09-05
 
-## ACTIVE — revision accepted; final QA retry needs OIDA sign-in, 2026-09-07 13:10 Bangkok
+## COMPLETE — governed revision and visible DeepSeek settings, 2026-09-07 13:25 Bangkok
+
+Production revision `6162caed-cde0-48b5-9ada-2e782dcbe480` is APPROVED with
+PM, QA, Document, and Infra all CREATED and zero failed checkpoints. The
+approved Data Platform QA project contains the new Recovery and UAT suites;
+live storage shows 5 active suites and 14 cases after retaining the original
+approved suites and revision history. Recovery is normalized to the QA contract
+as `OTHER`. The QA browser deep link and all four module bundles were checked
+after the final Pages deployment `88ecf5d8`.
+
+The retry defect that sent a partial revision through the new-draft endpoint is
+fixed: revision retries now call `approve-revision` with only failed modules,
+and the backend accepts a completed revision retry only when failed checkpoints
+remain. Unsupported suite types and negative authorization metadata are also
+normalized at the delivery boundary. A QA project with the `-2` suffix created
+by the faulty pre-fix retry remains preserved as audit evidence; no production
+record was destructively removed.
+
+AI provider configuration is now an open, highlighted card immediately below
+the requirement composer. It is labeled `AI model & DeepSeek API key`, explains
+server-only key storage, and reports whether a key is saved without returning
+the secret. Production currently uses Local LLM `mistral:latest`; no DeepSeek
+key is saved. Validation passes 58 pytest, Ruff, Mypy, JavaScript syntax, and all
+9 Pages gateway tests. Commit, push, deploy the final backend sources, restart,
+and keep the existing continuation automation paused after completion.
 
 GitHub CLI was authenticated through the user's existing signed-in browser.
 OIDA `main` was pushed to `https://github.com/gunaex/oida-next.git` and Infra
