@@ -67,6 +67,15 @@ def _plan_diff(before: dict, after: dict) -> dict:
     }
 
 
+def _revision_prompt(parent: dict, change_request: str) -> str:
+    return (
+        "Revise the current approved delivery plan using the requested change. "
+        "Return the complete revised plan, retaining unaffected work.\n\n"
+        f"CURRENT PLAN:\n{json.dumps(parent['plan'])}\n\n"
+        f"REQUESTED CHANGE:\n{change_request}"
+    )
+
+
 def install_ai_workflow(app, store, operator):
     with store.tx() as db:
         db.executescript("""
@@ -250,13 +259,26 @@ def install_ai_workflow(app, store, operator):
                 ),
             )
             result = view(db, child_id)
-        prompt = (
-            "Revise the current approved delivery plan using the requested change. "
-            "Return the complete revised plan, retaining unaffected work.\n\n"
-            f"CURRENT PLAN:\n{json.dumps(parent['plan'])}\n\n"
-            f"REQUESTED CHANGE:\n{body.change_request.strip()}"
-        )
+        prompt = _revision_prompt(parent, body.change_request.strip())
         tasks.add_task(generate_draft, child_id, parent["title"], prompt)
+        return result
+
+    @app.post("/api/v1/ai/drafts/{draft_id}/retry-generation", dependencies=[Depends(operator)])
+    async def retry_generation(draft_id: str, tasks: BackgroundTasks):
+        with store.tx() as db:
+            draft = view(db, draft_id)
+            if draft["status"] != "FAILED":
+                raise HTTPException(409, "Only failed AI generation can be retried")
+            prompt = draft["requirement"]
+            if draft["parent_id"]:
+                parent = view(db, draft["parent_id"])
+                prompt = _revision_prompt(parent, draft["requirement"])
+            db.execute(
+                "UPDATE ai_drafts SET status='GENERATING',error=NULL,updated=? WHERE id=?",
+                (time.time(), draft_id),
+            )
+            result = view(db, draft_id)
+        tasks.add_task(generate_draft, draft_id, draft["title"], prompt)
         return result
 
     @app.put("/api/v1/ai/drafts/{draft_id}", dependencies=[Depends(operator)])

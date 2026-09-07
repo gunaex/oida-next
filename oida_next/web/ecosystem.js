@@ -130,7 +130,12 @@ function renderDrafts(records) {
         message(result.status === "APPROVED" ? "Approved work was created in all four workspaces." : "Some workspaces failed. Successful work was kept; retry the unfinished items.");
       }, ""));
       card.append(editor, controls);
-    } else {
+    } else if (record.status === "FAILED") {
+      card.append(workflowButton("Retry AI generation", async () => {
+        await api(`/ai/drafts/${record.id}/retry-generation`, "POST");
+        message("AI generation restarted. Existing approved work remains unchanged.");
+      }));
+    } else if (record.status !== "GENERATING") {
       const targets = node("div", undefined, "target-grid");
       for (const name of ["pm", "qa", "document", "infra"]) targets.append(targetCard(name, record));
       card.append(targets);
